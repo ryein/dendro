@@ -8,7 +8,7 @@ namespace DendroGH {
         /// <summary>
         /// Initializes a new instance of the VolumeSettings class.
         /// </summary>
-        public VolumeSettings () : base ("Volume Settings", "vSettings",
+        public VolumeSettings () : base ("Create Settings", "vSettings",
             "Settings for converting different geometry types to and from volumes",
             "Dendro", "Convert") { }
 

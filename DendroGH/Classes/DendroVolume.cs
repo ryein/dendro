@@ -803,6 +803,7 @@ namespace DendroGH {
             this.Display = this.ConstructMesh (vertices, faces);
 
             // flip and rebuild
+            this.Display.Normals.ComputeNormals();
             this.Display.UnifyNormals();
             this.Display.Flip(true, true, true);
         }

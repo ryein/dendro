@@ -18,7 +18,7 @@ namespace DendroGH {
         protected override void RegisterInputParams (GH_Component.GH_InputParamManager pManager) {
             pManager.AddGenericParameter ("Volume", "V", "Volume geometry", GH_ParamAccess.item);
             pManager.AddIntegerParameter ("Width", "W", "(Optional) Width of smoothing. This value acts as a multiplier.", GH_ParamAccess.item, 1);
-            pManager.AddIntegerParameter ("Type", "T", "0 - gaussian, 1 - laplacian, 2 - mean, 3 - median", GH_ParamAccess.item, 1);
+            pManager.AddIntegerParameter ("Type", "T", "0 - gaussian, 1 - laplacian, 2 - mean, 3 - median", GH_ParamAccess.item, 2);
             pManager.AddIntegerParameter ("Iterations", "I", "Number of smoothing iterations", GH_ParamAccess.item, 1);
             pManager.AddGenericParameter ("Mask", "M", "(Optional) Mask for filter operations", GH_ParamAccess.item);
             pManager[4].Optional = true;
