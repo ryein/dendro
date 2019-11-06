@@ -2,6 +2,8 @@
 using System.Drawing;
 using Grasshopper.Kernel;
 
+[assembly: Grasshopper.Kernel.GH_Loading(GH_LoadingDemand.ForceDirect)]
+
 namespace DendroGH
 {
     public class DendroGHInfo : GH_AssemblyInfo
@@ -50,6 +52,22 @@ namespace DendroGH
             {
                 //Return a string representing your preferred contact details.
                 return "dev@ecrlabs.com";
+            }
+        }
+        public override string Version
+        {
+            get
+            {
+                //Return a string representing the version.
+                return "0.9.0.0";
+            }
+        }
+        public override string AssemblyVersion
+        {
+            get
+            {
+                //Return a string representing the assembly version. Not sure what's the difference to Version, let's use always the same. 
+                return this.Version;
             }
         }
     }
