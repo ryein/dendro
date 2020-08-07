@@ -995,12 +995,24 @@ namespace DendroGH {
         /// <param name="radius">desired point radius value</param>
         /// <returns>list of divided points from curve</returns>
         private List<Point3d> CurveToPoints (Curve crv, double radius) {
-            var cParams = crv.DivideByLength (radius * 0.25, true);
-            List<Point3d> cPoints = new List<Point3d> ();
+            
+            List<Point3d> cPoints = new List<Point3d>();
 
-            foreach (double param in cParams) {
-                Point3d pt = crv.PointAt (param);
-                cPoints.Add (pt);
+            // Curve longer than a 1/4 of radius
+            if (crv.GetLength() > radius * 0.25)
+            {
+                var cParams = crv.DivideByLength(radius * 0.25, true);
+                foreach (double param in cParams)
+                {
+                    Point3d pt = crv.PointAt(param);
+                    cPoints.Add(pt);
+                }
+            }
+            // If curve too short add endpoints to point list
+            else
+            {
+                cPoints.Add(crv.PointAtNormalizedLength(0));
+                cPoints.Add(crv.PointAtNormalizedLength(1));
             }
 
             return cPoints;
