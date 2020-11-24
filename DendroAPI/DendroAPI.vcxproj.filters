@@ -51,8 +51,4 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-    <None Include="Nuget.config" />
-  </ItemGroup>
 </Project>
