@@ -55,6 +55,7 @@
     <Compile Include="Classes\DendroMask.cs" />
     <Compile Include="Classes\DendroSettings.cs" />
     <Compile Include="Classes\DendroVolume.cs" />
+    <Compile Include="Components\ClosestPoint.cs" />
     <Compile Include="Components\MaskCreate.cs" />
     <Compile Include="Components\MaskParam.cs" />
     <Compile Include="Components\ReadFile.cs" />
@@ -141,6 +142,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\ico_vox_mesh.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\ico_cp.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

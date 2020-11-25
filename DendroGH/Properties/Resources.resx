@@ -127,6 +127,9 @@
   <data name="ico_bool_union" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\ico_bool_union.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="ico_cp" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\ico_cp.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="ico_curve_vox" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\ico_curve_vox.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
