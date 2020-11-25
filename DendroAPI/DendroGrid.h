@@ -39,6 +39,8 @@ public:
 	void Blend(DendroGrid bGrid, double bPosition, double bEnd);
 	void Blend(DendroGrid bGrid, double bPosition, double bEnd, DendroGrid vMask, double min, double max, bool invert);
 
+	void ClosestPoint(std::vector<openvdb::Vec3R>& points, std::vector<float>& distances);
+
 	DendroMesh Display();
 
 	void UpdateDisplay();

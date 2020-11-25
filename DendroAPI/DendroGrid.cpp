@@ -9,6 +9,7 @@
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
 #include <openvdb/Types.h>
+#include <openvdb/tools/VolumeToSpheres.h>
 
 #include <cmath>
 
@@ -314,6 +315,12 @@ void DendroGrid::Blend(DendroGrid bGrid, double bPosition, double bEnd, DendroGr
 
 	double bStart = bPosition * bEnd;
 	morph.advect(bStart, bEnd);
+}
+
+void DendroGrid::ClosestPoint(std::vector<openvdb::Vec3R>& points, std::vector<float>& distances)
+{
+	auto csp = openvdb::tools::ClosestSurfacePoint<openvdb::FloatGrid>::create(*mGrid);
+	csp->searchAndReplace(points, distances);
 }
 
 DendroMesh DendroGrid::Display()

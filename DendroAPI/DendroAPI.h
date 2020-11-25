@@ -50,6 +50,9 @@ extern "C" {
 	extern DENDRO_API void DendroBlend(DendroGrid * bGrid, DendroGrid * eGrid, double bPosition, double bEnd);
 	extern DENDRO_API void DendroBlendMask(DendroGrid * bGrid, DendroGrid * eGrid, double bPosition, double bEnd, DendroGrid * mask, double min, double max, bool invert);
 
+	// utilities and analysis
+	extern DENDRO_API float* DendroClosestPoint(DendroGrid* grid, float* vPoints, int vCount, int* rSize);
+
 #ifdef __cplusplus
 }
 #endif
