@@ -817,7 +817,7 @@ namespace DendroGH {
         }
         #endregion Methods
 
-        #region Display
+#region Display
         /// <summary>
         /// update the mesh representation of the volume
         /// </summary>
@@ -831,8 +831,19 @@ namespace DendroGH {
 
             this.Display = this.ConstructMesh (vertices, faces);
 
-            // flip and rebuild
-            this.Display.Normals.ComputeNormals();
+            if (!this.Display.IsValid)
+            {
+                this.Display.Vertices.CombineIdentical(true, true);
+                this.Display.Faces.CullDegenerateFaces();
+                this.Display.Vertices.CullUnused();
+                this.Display.RebuildNormals();
+            } else {
+                // flip and rebuild
+                this.Display.Normals.ComputeNormals();
+            }
+
+
+
         }
 
         /// <summary>
@@ -849,9 +860,17 @@ namespace DendroGH {
 
             this.Display = this.ConstructMesh (vertices, faces);
 
+            if (!this.Display.IsValid)
+            {
+                this.Display.Vertices.CombineIdentical(true, true);
+                this.Display.Faces.CullDegenerateFaces();
+                this.Display.Vertices.CullUnused();
+                this.Display.RebuildNormals();
+            }
+
             // flip and rebuild
-            this.Display.Normals.ComputeNormals();
             this.Display.UnifyNormals();
+            this.Display.Normals.ComputeNormals();
             this.Display.Flip(true, true, true);
         }
 
