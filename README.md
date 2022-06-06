@@ -26,11 +26,11 @@ To make working with the library easier, we've included a file named "dendro_lib
 ##### DendroGH (C#)
 Since there are multiple versions of Rhino, each with their specific SDK, we added the Rhinocommon and Grasshopper-3D libraries as a nuget package in order to let you specifically target your desired Rhino version. That can be changed by `Right-clicking the C# project`, then selecting `Manage Nuget Packages`, clicking the `Installed` tab, `Selecting` your desired package, and finally, changing the `Version` in the right panel.
 
-It is targeted for Rhino 5 by default because that seems to be more universal and forward compatible in Rhino 6.
+It is targeted for Rhino 6 by default because that seems to be more universal and forward compatible in Rhino 7.
 
 ## Building
 
-Dendro was built using Microsoft Visual Studio 2019, but you should be able to re-target for other versions. It will also copy all necessary dependency dlls into the output folder to provide an easy reference for where dependency dlls can be found.
+Dendro was built using Microsoft Visual Studio 2022, but you should be able to re-target for other versions. It will also copy all necessary dependency dlls into the output folder to provide an easy reference for where dependency dlls can be found. Make sure to build for "Release" and "x64".
 
 ## More Info
 
