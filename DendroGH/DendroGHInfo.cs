@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.Reflection;
 using Grasshopper.Kernel;
 
 [assembly: Grasshopper.Kernel.GH_Loading(GH_LoadingDemand.ForceDirect)]
@@ -58,16 +59,18 @@ namespace DendroGH
         {
             get
             {
-                //Return a string representing the version.
-                return "0.9.0.0";
+                // keep the version of the plugin in sync with AssemblyVersion
+                return AssemblyVersion;
             }
         }
         public override string AssemblyVersion
         {
             get
             {
-                //Return a string representing the assembly version. Not sure what's the difference to Version, let's use always the same. 
-                return this.Version;
+                // make use of the AssemblyVersion (defined in AssemblyInfo.cs)
+                var assembly = Assembly.GetExecutingAssembly();
+                var assemblyName = new AssemblyName(assembly.FullName);
+                return assemblyName.Version.ToString();
             }
         }
     }
