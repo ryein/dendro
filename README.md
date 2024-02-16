@@ -32,6 +32,24 @@ It is targeted for Rhino 6 by default because that seems to be more universal an
 
 Dendro was built using Microsoft Visual Studio 2022, but you should be able to re-target for other versions. It will also copy all necessary dependency dlls into the output folder to provide an easy reference for where dependency dlls can be found. Make sure to build for "Release" and "x64".
 
+### Building DendroAPI (C++) on MacOS
+
+Use Homebrew (`brew`) to install the dependencies for the C++ library:
+
+```
+brew install boost cmake c-blosc openvdb tbb zlib
+```
+
+Run the following from the DendroAPI directory to compile using `cmake`:
+
+```
+mkdir build
+cd build
+cmake ..
+make
+```
+
 ## More Info
 
 Dendro is using OpenVDB. For more information on the library, please visit [here](http://www.openvdb.org/).
+
