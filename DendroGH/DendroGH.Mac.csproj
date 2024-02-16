@@ -9,6 +9,11 @@
     <!-- Add any other necessary property settings here -->
   </PropertyGroup>
 
+  <!-- This is used in DendroVolume to load the correct DLL -->
+  <PropertyGroup Condition="'$(OS)' == 'Unix'">
+    <DefineConstants>UNIX</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <Reference Include="Eto">
       <!-- <HintPath>/Applications/Rhino 7.app/Contents/Frameworks/RhCore.framework/Resources/Eto.dll</HintPath> -->

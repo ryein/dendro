@@ -15,70 +15,158 @@ namespace DendroGH {
     public class DendroVolume : IDisposable {
 
 #region PInvokes
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern IntPtr DendroCreate ();
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern void DendroDelete (IntPtr grid);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern IntPtr DendroDuplicate (IntPtr grid);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern bool DendroRead (IntPtr grid, string filename);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern bool DendroWrite (IntPtr grid, string filename);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern bool DendroFromMesh(IntPtr grid, float[] vertices, int vCount, int[] faces, int fCount, double voxelSize, double bandwidth);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern bool DendroFromPoints(IntPtr grid, double[] points, int pCount, double[] radii, int rCount, double voxelSize, double bandwidth);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern bool DendroTransform (IntPtr grid, double[] matrix, int mCount);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static public extern void DendroUnion (IntPtr grid, IntPtr csgGrid);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static public extern void DendroDifference (IntPtr grid, IntPtr csgGrid);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static public extern void DendroIntersection (IntPtr grid, IntPtr csgGrid);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static public extern void DendroOffset (IntPtr grid, double amount);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static public extern void DendroOffsetMask (IntPtr grid, double amount, IntPtr mask, double min, double max, bool invert);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static public extern void DendroSmooth (IntPtr grid, int type, int iterations, int width);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static public extern void DendroSmoothMask (IntPtr grid, int type, int iterations, int width, IntPtr mask, double min, double max, bool invert);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static public extern void DendroBlend (IntPtr bGrid, IntPtr eGrid, double bPosition, double bEnd);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static public extern void DendroBlendMask (IntPtr bGrid, IntPtr eGrid, double bPosition, double bEnd, IntPtr mask, double min, double max, bool invert);
 
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern IntPtr DendroClosestPoint(IntPtr grid, float[] vertices, int vCount, out int rSize);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern void DendroToMesh (IntPtr grid);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern void DendroToMeshSettings (IntPtr grid, double isovalue, double adaptivity);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern IntPtr DendroVertexBuffer (IntPtr grid, out int size);
 
-        [DllImport ("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+        #else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+        #endif
         static private extern IntPtr DendroFaceBuffer (IntPtr grid, out int size);
 #endregion PInvokes
 
