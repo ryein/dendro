@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,7 +7,7 @@ using Rhino.Geometry;
 
 namespace DendroGH {
     /// <summary>
-    /// c# wrapper for c++ api. this holds all external dll calls and is 
+    /// c# wrapper for c++ api. this holds all external dll calls and is
     /// primary point of communication with all openvdb functions. the mGrid
     /// member is a pointer to a c++ class and all DendroVolume methods operate
     /// specific functions on that c++ mGrid class
@@ -136,7 +136,7 @@ namespace DendroGH {
         }
 
         /// <summary>
-        /// mesh constructor 
+        /// mesh constructor
         /// </summary>
         /// <param name="vMesh">mesh to build volume from</param>
         /// <param name="vSettings">voxelization settings to be used</param>
@@ -961,7 +961,7 @@ namespace DendroGH {
 
 #region Helpers
         /// <summary>
-        /// create a point set, with a corresponding radius value list, for every curve. each curve provided 
+        /// create a point set, with a corresponding radius value list, for every curve. each curve provided
         /// is divided into points, using its supplied radius value and then added to the whole point set.
         /// </summary>
         /// <remark>called from CreateFromCurve when multiple radius values are supplied</remark>
@@ -997,7 +997,7 @@ namespace DendroGH {
         }
 
         /// <summary>
-        /// create a point set, with a corresponding radius value list, for every curve. each curve provided 
+        /// create a point set, with a corresponding radius value list, for every curve. each curve provided
         /// is divided into points, using its supplied radius value and then added to the whole point set.
         /// </summary>
         /// <remark>called from CreateFromCurve when a single radius value is supplied</remark>
@@ -1061,7 +1061,7 @@ namespace DendroGH {
         /// <param name="radius">desired point radius value</param>
         /// <returns>list of divided points from curve</returns>
         private List<Point3d> CurveToPoints (Curve crv, double radius) {
-            
+
             List<Point3d> cPoints = new List<Point3d>();
 
             // Curve longer than a 1/4 of radius
