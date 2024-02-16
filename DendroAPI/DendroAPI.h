@@ -6,10 +6,14 @@
 
 #include "DendroGrid.h"
 
+#ifdef _WIN32
 #ifdef DENDROAPI_EXPORTS
 #define DENDRO_API __declspec(dllexport)
 #else
 #define DENDRO_API __declspec(dllimport)
+#endif
+#else
+#define DENDRO_API
 #endif
 
 #ifdef __cplusplus
