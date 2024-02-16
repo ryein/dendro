@@ -49,6 +49,11 @@ cmake ..
 make
 ```
 
+### Building DendroGH (C#) on MacOS
+
+* Install .Net Core (currently v8, v6+ is required for Apple Silicon) via brew: `brew install dotnet`
+* Compile with `dotnet build DendroGH.Mac.csproj`
+
 ## More Info
 
 Dendro is using OpenVDB. For more information on the library, please visit [here](http://www.openvdb.org/).
