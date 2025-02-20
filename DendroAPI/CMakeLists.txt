@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.30)
 project(DendroAPI)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -6,7 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Find Boost
 find_package(Boost REQUIRED)
+find_package(OpenVDB REQUIRED)
+find_package(TBB CONFIG REQUIRED)
+find_package(blosc CONFIG REQUIRED)
 
+# Mihai: these dirs don't seem to hurt, so I'll leave them here for the future
 # Libraries to include and link against
 include_directories(/usr/local/include
     ${Boost_INCLUDE_DIRS}
@@ -30,14 +34,16 @@ target_compile_definitions(DendroAPI PRIVATE
     _USE_MATH_DEFINES
     NOMINMAX
     DENDROAPI_EXPORTS
+	IMATH_HALF_NO_LOOKUP_TABLE
 )
 
 target_link_libraries(DendroAPI
-    openvdb
-    tbb
-    blosc
+    OpenVDB::openvdb
+    TBB::tbb
     ${Boost_LIBRARIES}
 )
+
+set_source_files_properties(DendroGrid.cpp PROPERTIES COMPILE_OPTIONS "/bigobj")
 
 # Optional: Define post-build commands if needed
 # add_custom_command(TARGET DendroAPI POST_BUILD ...)

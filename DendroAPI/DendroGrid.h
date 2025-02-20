@@ -6,8 +6,6 @@
 #include "DendroParticle.h"
 #include "DendroMesh.h"
 
-#define IMATH_HALF_NO_LOOKUP_TABLE
-
 #include <openvdb/openvdb.h>
 #include <vector>
 #include <string>
