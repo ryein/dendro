@@ -97,7 +97,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: rude-${{ runner.os }}-${{ matrix.c_compiler }}
+        name: dendro-${{ runner.os }}-${{ matrix.c_compiler }}
         path: ${{ steps.strings.outputs.build-output-dir }}
         retention-days: 7  # Keep artifacts for 7 days (default)
 
