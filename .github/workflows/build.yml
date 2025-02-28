@@ -64,10 +64,19 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: ./vcpkg/bootstrap-vcpkg.sh
 
-    - name: Set up vcpkg cache
+    - name: Set up vcpkg cache (Linux)
+      if: matrix.os == 'ubuntu-latest'
       uses: actions/cache@v3
       with:
         path: ~/.cache/vcpkg
+        key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+        restore-keys: vcpkg-${{ runner.os }}-
+    
+    - name: Set up vcpkg cache (Windows)
+      if: matrix.os == 'ubuntu-latest'
+      uses: actions/cache@v3
+      with:
+        path: C:\Users\runneradmin\AppData\Local\vcpkg\archives
         key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
         restore-keys: vcpkg-${{ runner.os }}-
     
