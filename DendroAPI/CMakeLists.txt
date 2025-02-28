@@ -37,12 +37,21 @@ target_compile_definitions(DendroAPI PRIVATE
 	IMATH_HALF_NO_LOOKUP_TABLE
 )
 
-target_link_libraries(DendroAPI
-    OpenVDB::openvdb
-    TBB::tbb
-	blosc
-    ${Boost_LIBRARIES}
-)
+if (APPLE)
+	target_link_libraries(DendroAPI
+		OpenVDB::openvdb
+		TBB::tbb
+		blosc
+		${Boost_LIBRARIES}
+	)
+else()
+	target_link_libraries(DendroAPI
+		OpenVDB::openvdb
+		TBB::tbb
+		${Boost_LIBRARIES}
+	)
+endif()
+
 if (WIN32)
 	set_source_files_properties(DendroGrid.cpp PROPERTIES COMPILE_OPTIONS "/bigobj")
 endif()
