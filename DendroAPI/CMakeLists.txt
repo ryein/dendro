@@ -42,8 +42,9 @@ target_link_libraries(DendroAPI
     TBB::tbb
     ${Boost_LIBRARIES}
 )
-
-set_source_files_properties(DendroGrid.cpp PROPERTIES COMPILE_OPTIONS "/bigobj")
+if (WIN32)
+	set_source_files_properties(DendroGrid.cpp PROPERTIES COMPILE_OPTIONS "/bigobj")
+endif()
 
 # Optional: Define post-build commands if needed
 # add_custom_command(TARGET DendroAPI POST_BUILD ...)

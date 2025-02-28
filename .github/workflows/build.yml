@@ -64,6 +64,13 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: ./vcpkg/bootstrap-vcpkg.sh
 
+    - name: Set up vcpkg cache
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/vcpkg
+        key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+        restore-keys: vcpkg-${{ runner.os }}-
+    
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
