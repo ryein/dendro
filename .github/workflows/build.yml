@@ -53,6 +53,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Clone vcpkg
+      run: git clone https://github.com/microsoft/vcpkg.git
+
+    - name: Install vcpkg (Windows)
+        if: matrix.os == 'windows-latest'
+        run: vcpkg/bootstrap-vcpkg.bat
+        
+    - name: Install vcpkg (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: ./vcpkg/bootstrap-vcpkg.sh
+
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
@@ -69,6 +80,7 @@ jobs:
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -DCMAKE_CXX_STANDARD=11
+        -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
         -S ${{ github.workspace }}/DendroAPI
 
     - name: Build
