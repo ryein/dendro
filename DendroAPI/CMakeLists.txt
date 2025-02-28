@@ -14,10 +14,10 @@ find_package(blosc CONFIG REQUIRED)
 # Libraries to include and link against
 include_directories(/usr/local/include
     ${Boost_INCLUDE_DIRS}
-    /opt/homebrew/include
+    #/opt/homebrew/include
 )
 link_directories(/usr/local/lib
-    /opt/homebrew/lib
+    #/opt/homebrew/lib
 )
 
 add_library(DendroAPI SHARED
