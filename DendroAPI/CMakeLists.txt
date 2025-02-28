@@ -40,6 +40,7 @@ target_compile_definitions(DendroAPI PRIVATE
 target_link_libraries(DendroAPI
     OpenVDB::openvdb
     TBB::tbb
+	blosc
     ${Boost_LIBRARIES}
 )
 if (WIN32)
