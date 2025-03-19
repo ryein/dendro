@@ -36,6 +36,9 @@ jobs:
           - os: macos-13
             c_compiler: clang
             cpp_compiler: clang++
+          - os: macos-14
+            c_compiler: clang
+            cpp_compiler: clang++
         exclude:
           - os: windows-latest
             c_compiler: gcc
@@ -48,6 +51,10 @@ jobs:
           - os: macos-13
             c_compiler: cl
           - os: macos-13
+            c_compiler: gcc
+          - os: macos-14
+            c_compiler: cl
+          - os: macos-14
             c_compiler: gcc
 
     steps:
