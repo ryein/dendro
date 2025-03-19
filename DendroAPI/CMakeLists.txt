@@ -41,7 +41,7 @@ if (APPLE)
 	target_link_libraries(DendroAPI
 		OpenVDB::openvdb
 		TBB::tbb
-		blosc::blosc
+		blosc_static
 		${Boost_LIBRARIES}
 	)
 else()
