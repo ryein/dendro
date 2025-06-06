@@ -20,6 +20,9 @@ link_directories(/usr/local/lib
     #/opt/homebrew/lib
 )
 
+# Optional architecture suffix override (set via -DARCH_SUFFIX)
+set(ARCH_SUFFIX "" CACHE STRING "Architecture suffix for output name")
+
 # Set the source files
 set(SOURCES
     DendroAPI.cpp
@@ -30,14 +33,17 @@ set(SOURCES
 )
 
 # Create target MacOS (DendroAPI_macos.bundle)
+
 if(APPLE)
     add_library(DendroAPI MODULE ${SOURCES})
+
     set_target_properties(DendroAPI PROPERTIES
         BUNDLE TRUE
         MACOSX_BUNDLE TRUE
         SUFFIX ".bundle"
-        OUTPUT_NAME "DendroAPI_macos" # Name of the output library to contain the _macos suffix
+        OUTPUT_NAME "DendroAPI_macos${ARCH_SUFFIX}" # Name of the output library to contain the _macos suffix with optional architecture suffix (arm / x86_64)
     )
+
 # Add library for Windows (DendroAPI.dll) and Linux(DendroAPI.so)
 else()
     add_library(DendroAPI SHARED ${SOURCES})
@@ -54,20 +60,16 @@ target_compile_definitions(DendroAPI PRIVATE
 	IMATH_HALF_NO_LOOKUP_TABLE
 )
 
-# Platform-specific link libraries
-if (APPLE)
-	target_link_libraries(DendroAPI
-		OpenVDB::openvdb
-		TBB::tbb
-		blosc_static
-		${Boost_LIBRARIES}
-	)
-else()
-	target_link_libraries(DendroAPI
-		OpenVDB::openvdb
-		TBB::tbb
-		${Boost_LIBRARIES}
-	)
+# Platform-specific linking
+target_link_libraries(DendroAPI
+    OpenVDB::openvdb
+    TBB::tbb
+    ${Boost_LIBRARIES}
+)
+
+# For Apple, link against blosc if available
+if(APPLE)
+    target_link_libraries(DendroAPI blosc_static)
 endif()
 
 # Windows-specific compile option
