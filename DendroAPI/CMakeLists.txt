@@ -20,7 +20,8 @@ link_directories(/usr/local/lib
     #/opt/homebrew/lib
 )
 
-add_library(DendroAPI SHARED
+# Set the source files
+set(SOURCES
     DendroAPI.cpp
     DendroGrid.cpp
     DendroMesh.cpp
@@ -28,6 +29,22 @@ add_library(DendroAPI SHARED
     stdafx.cpp
 )
 
+# Create target MacOS (DendroAPI_macos.bundle)
+if(APPLE)
+    add_library(DendroAPI MODULE ${SOURCES})
+    set_target_properties(DendroAPI PROPERTIES
+        BUNDLE TRUE
+        MACOSX_BUNDLE TRUE
+        SUFFIX ".bundle"
+        OUTPUT_NAME "DendroAPI_macos" # Name of the output library to contain the _macos suffix
+    )
+# Add library for Windows (DendroAPI.dll) and Linux(DendroAPI.so)
+else()
+    add_library(DendroAPI SHARED ${SOURCES})
+endif()
+
+
+# Preprocessor definitions
 target_compile_definitions(DendroAPI PRIVATE
     OPENVDB_OPENEXR_STATICLIB
     OPENVDB_STATICLIB
@@ -37,6 +54,7 @@ target_compile_definitions(DendroAPI PRIVATE
 	IMATH_HALF_NO_LOOKUP_TABLE
 )
 
+# Platform-specific link libraries
 if (APPLE)
 	target_link_libraries(DendroAPI
 		OpenVDB::openvdb
@@ -52,9 +70,13 @@ else()
 	)
 endif()
 
+# Windows-specific compile option
 if (WIN32)
 	set_source_files_properties(DendroGrid.cpp PROPERTIES COMPILE_OPTIONS "/bigobj")
 endif()
+
+# Position-independent code for shared objects and bundles
+set_property(TARGET DendroAPI PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Optional: Define post-build commands if needed
 # add_custom_command(TARGET DendroAPI POST_BUILD ...)
