@@ -19,6 +19,13 @@ fi
 BUILD_DIR_ARM64="./builds_arm64"
 BUILD_DIR_X86="./builds_x86_64"
 
+export PATH="/opt/homebrew/bin:$PATH"
+export CC=/usr/bin/clang
+export CXX=/usr/bin/clang++
+export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+export CMAKE_MAKE_PROGRAM=$(which ninja)
+
+
 # ====================
 # Build for arm64
 # ====================
@@ -26,16 +33,9 @@ echo "🔧 Building for arm64..."
 rm -rf "$BUILD_DIR_ARM64"
 
 # Since the OPenVDB doesn't work with vcpkg on arm64, we are forcing the triplet to arm64-osx-release
-echo "📦 Installing vcpkg dependencies for arm64-osx-release..."
-"${VCPKG_PATH}/vcpkg" install --triplet arm64-osx-release
+echo "📦 Installing vcpkg dependencies for arm64-osx..."
+"${VCPKG_PATH}/vcpkg" install --triplet arm64-osx
 
-export PATH="/opt/homebrew/bin:$PATH"
-export CC=/usr/bin/clang
-export CXX=/usr/bin/clang++
-export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
-
-NINJA_BIN=$(which ninja)
-export CMAKE_MAKE_PROGRAM="$NINJA_BIN"
 
 cmake -B "$BUILD_DIR_ARM64" -S . \
   -G Ninja \
@@ -61,9 +61,6 @@ rm -rf "$BUILD_DIR_X86"
 echo "📦 Installing vcpkg dependencies for x64-osx..."
 "${VCPKG_PATH}/vcpkg" install --triplet=x64-osx
 
-export CC="/usr/bin/clang"
-export CXX="/usr/bin/clang++"
-export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
 
 cmake -B "$BUILD_DIR_X86" -S . \
   -G "$GENERATOR" \
