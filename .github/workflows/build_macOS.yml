@@ -1,0 +1,185 @@
+name: CMake build for MacOS Universal Builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master" ]
+
+jobs:
+    build-macos:
+        runs-on: ${{ matrix.os }}
+
+        strategy:
+            # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations. Consider changing this to true when your workflow is stable.
+            fail-fast: false
+
+            # Set up a matrix to run the following 2 configurations:
+            # See runners configurations at https://docs.github.com/en/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners#standard-github-hosted-runners-for-public-repositories
+            matrix:
+                include:
+
+                # MacOS 13 - Intel
+                - os: macos-13
+                  arch: x86_64
+                  runner_arch: intel
+                  c_compiler: clang
+                  cpp_compiler: clang++
+
+                # MacOS 14 - Apple Silicon
+                - os: macos-14  
+                  arch: arm64
+                  runner_arch: arm
+                  c_compiler: clang
+                  cpp_compiler: clang++
+
+    
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+
+
+        - name: Set up vcpkg cache
+          uses: actions/cache@v4
+          id: vcpkg-cache
+          with:
+            path: |
+                vcpkg
+                ~/.cache/vcpkg
+            key: vcpkg-${{ matrix.os }}-${{ hashFiles('vcpkg.json') }}
+            restore-keys: |
+                vcpkg-${{ matrix.os }}-
+                vcpkg-
+
+
+        - name: Clone and bootstrap vcpkg
+          if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+          run: |
+            git clone https://github.com/microsoft/vcpkg.git
+            ./vcpkg/bootstrap-vcpkg.sh
+          
+
+        - name: Bootstrap vcpkg (cache hit)
+          if: steps.vcpkg-cache.outputs.cache-hit == 'true'
+          run: |
+            if [ ! -f vcpkg/vcpkg ]; then
+            ./vcpkg/bootstrap-vcpkg.sh
+            fi
+
+
+        - name: Set reusable strings
+          id: strings
+          shell: bash
+          run: |
+            echo "build-output-dir=${{ github.workspace }}/build-${{ matrix.arch }}" >> "$GITHUB_OUTPUT"
+
+
+        - name: Configure CMake
+          run: |
+            cmake -B ${{ steps.strings.outputs.build-output-dir }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }} \
+            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=11 \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake \
+            -S ${{ github.workspace }}/DendroAPI
+
+
+        - name: CMake Build
+          run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config Release
+
+        
+        - name: Upload build artifact
+          uses: actions/upload-artifact@v4
+          with:
+            name: dendro-${{ matrix.runner_arch }}-build
+            path: ${{ steps.strings.outputs.build-output-dir }}
+            retention-days: 1
+
+
+    create-universal-bundle:
+        needs: build-macos
+        runs-on: macos-14
+
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+
+          
+        - name: Download Intel build
+          uses: actions/download-artifact@v4
+          with:
+            name: dendro-intel-build
+            path: build-intel
+
+
+        - name: Download ARM build  
+          uses: actions/download-artifact@v4
+          with:
+            name: dendro-arm-build
+            path: build-arm
+
+
+        - name: Create universal binary
+          run: |
+            # Define paths to the binaries
+            INTEL_BINARY="build-intel/DendroAPI_macos.bundle/Contents/MacOS/DendroAPI_macos"
+            ARM_BINARY="build-arm/DendroAPI_macos.bundle/Contents/MacOS/DendroAPI_macos"
+            
+            # Verify the binaries exist
+            echo "Checking for Intel binary..."
+            ls -la "$INTEL_BINARY" || echo "Intel binary not found at expected location"
+            
+            echo "Checking for ARM binary..."
+            ls -la "$ARM_BINARY" || echo "ARM binary not found at expected location"
+
+            # Show architecture info for both binaries
+            echo "Intel binary architecture:"
+            file "$INTEL_BINARY" || echo "Cannot read Intel binary"
+            
+            echo "ARM binary architecture:"
+            file "$ARM_BINARY" || echo "Cannot read ARM binary"
+
+            # Copy Intel bundle as the base for universal bundle
+            echo "Creating universal bundle from Intel bundle..."
+            cp -R "build-intel/DendroAPI_macos.bundle" "DendroAPI_macos_universal.bundle"
+
+            # Create universal binary using lipo
+            echo "Creating universal binary with lipo..."
+            lipo -create \
+            "$INTEL_BINARY" \
+            "$ARM_BINARY" \
+            -output "DendroAPI_macos_universal_binary"
+
+            # Verify the universal binary
+            echo "Universal binary architecture info:"
+            lipo -info "DendroAPI_macos_universal_binary"
+            file "DendroAPI_macos_universal_binary"
+
+            # Replace the binary in the universal bundle
+            echo "Replacing binary in universal bundle..."
+            cp "DendroAPI_macos_universal_binary" \
+               "DendroAPI_macos_universal.bundle/Contents/MacOS/DendroAPI_macos"
+
+            # Verify the final bundle binary
+            echo "Final bundle binary architecture:"
+            lipo -info "DendroAPI_macos_universal.bundle/Contents/MacOS/DendroAPI_macos"
+            
+            echo "Universal bundle created successfully!"
+            echo "Bundle contents:"
+            find DendroAPI_macos_universal.bundle -type f
+
+
+        - name: Create release package
+          run: |
+            # Create a zip archive of the universal bundle
+            zip -r dendro-universal-plugin.zip DendroAPI_macos_universal.bundle/
+            
+            echo "Package created: dendro-universal-plugin.zip"
+            echo "Package size: $(du -h dendro-universal-plugin.zip | cut -f1)"
+            
+            # Show final bundle info
+            echo "Final universal bundle info:"
+            echo "Bundle size: $(du -sh DendroAPI_macos_universal.bundle | cut -f1)"
+            echo "Binary architecture: $(lipo -info DendroAPI_macos_universal.bundle/Contents/MacOS/DendroAPI_macos)"
+        
