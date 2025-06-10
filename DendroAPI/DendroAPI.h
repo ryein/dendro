@@ -19,9 +19,6 @@
 // Other platforms
 #else
 #define 	DENDRO_API __declspec(dllimport)
-
-#else
-#define 	DENDRO_API
 #endif
 
 
