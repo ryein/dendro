@@ -16,7 +16,7 @@
 	#endif
 
 // MacOS
-#elif       __APPLE__ && __MACH__
+#elif __APPLE__ && __MACH__
 	#ifdef DENDROAPI_EXPORTS
 	#define DENDRO_API __attribute__(( visibility("default") ))
 	#endif
