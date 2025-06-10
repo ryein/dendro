@@ -7,8 +7,10 @@
 #include "DendroGrid.h"
 
 // Windows
-#ifdef 		_WIN32 || DENDROAPI_EXPORTS
+#ifdef 		_WIN32
+#ifdef 		DENDROAPI_EXPORTS
 #define 	DENDRO_API __declspec(dllexport)
+#endif
 
 // MacOS
 #elif       __APPLE__ && __MACH__
@@ -17,6 +19,9 @@
 // Other platforms
 #else
 #define 	DENDRO_API __declspec(dllimport)
+
+#else
+#define 	DENDRO_API
 #endif
 
 
