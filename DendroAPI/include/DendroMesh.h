@@ -6,10 +6,10 @@
 #include <openvdb/openvdb.h>
 #include <vector>
 
-class DendroMesh {
+class DendroMesh
+{
 
 public:
-
 	DendroMesh();
 	~DendroMesh();
 

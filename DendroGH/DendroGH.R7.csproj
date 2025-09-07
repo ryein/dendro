@@ -1,0 +1,78 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <Platforms>x64</Platforms>
+    <AssemblyName>DendroGH</AssemblyName>
+    <RootNamespace>DendroGH</RootNamespace>
+    <OutputType>Library</OutputType>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <Deterministic>true</Deterministic>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <RuntimeIdentifier></RuntimeIdentifier>
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
+
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <RepoRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)','..'))</RepoRoot>
+    <DendroStageKind Condition="'$(DendroStageKind)'==''">dev</DendroStageKind>
+    <DendroVersion Condition="'$(DendroVersion)'==''">dev</DendroVersion>
+
+
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <NativeWin>$(RepoRoot)DendroAPI\build\win-x64\out\Release</NativeWin>
+    <NativeMac>$(RepoRoot)DendroAPI/build/mac-universal/out/Release</NativeMac>
+  </PropertyGroup>
+
+
+  <PropertyGroup>
+    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <CustomToolNamespace>DendroGH.Properties</CustomToolNamespace>
+    </EmbeddedResource>
+
+    <Compile Update="Properties\Resources.Designer.cs">
+      <AutoGen>true</AutoGen>
+      <DesignTime>true</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Resources.Extensions" Version="8.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Rhino 7 -->
+  <ItemGroup>
+    <PackageReference Include="RhinoCommon" Version="7.0.20314.3001" />
+    <PackageReference Include="Grasshopper" Version="7.0.20314.3001" />
+  </ItemGroup>
+
+  <Target Name="PackGha" AfterTargets="Build">
+    <!-- 1) Make .gha beside the built DLL -->
+    <Copy SourceFiles="$(TargetPath)"
+      DestinationFiles="$(TargetDir)DendroGH.gha"
+      OverwriteReadOnlyFiles="true"
+      SkipUnchangedFiles="true" />
+
+    <ItemGroup>
+      <NativeWinFiles Include="$(NativeWin)\*.dll" Condition="Exists('$(NativeWin)')" />
+      <NativeMacFiles Include="$(NativeMac)\*.dylib" Condition="Exists('$(NativeMac)')" />
+    </ItemGroup>
+
+    <!-- 3) Copy natives next to the .gha for local runs -->
+    <Copy SourceFiles="@(NativeWinFiles)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true"
+      Condition=" '@(NativeWinFiles)' != '' " />
+    <Copy SourceFiles="@(NativeMacFiles)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true"
+      Condition=" '@(NativeMacFiles)' != '' " />
+  </Target>
+</Project>

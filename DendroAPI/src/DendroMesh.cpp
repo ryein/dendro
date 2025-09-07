@@ -1,6 +1,4 @@
-#include "stdafx.h"
 #include "DendroMesh.h"
-
 
 DendroMesh::DendroMesh()
 {
@@ -23,7 +21,8 @@ DendroMesh::~DendroMesh()
 
 bool DendroMesh::IsValid()
 {
-	if (mFaces.size() > 0 && mVertices.size() > 0) {
+	if (mFaces.size() > 0 && mVertices.size() > 0)
+	{
 		return true;
 	}
 
@@ -65,4 +64,3 @@ void DendroMesh::Clear()
 	mVertices.clear();
 	mFaces.clear();
 }
-

@@ -1,51 +1,50 @@
-# Dendro
-Dendro is a volumetric modeling plug-in for Grasshopper-3D built on top of the OpenVDB library. It provides multiple ways to wrap points, curves, and meshes as a volumetric data within Grasshopper-3D, allowing you to perform various operations on those volumes. Dendro includes components for boolean, smoothing, offsets, and morphing operations. You can find out more details of its features and download a working version [here](https://www.food4rhino.com/app/dendro)
+# 🚧 Dendro v2 (Work in Progress)
 
-## Design
+**⚠️ This is not the main branch.**  
+The `v2` branch is under active development and is **not yet functional**.  
+If you are looking for a usable version of Dendro, please switch to the `main` branch.
 
-I have been using the OpenVDB library for a couple years, but needed something to prototype quicker with. I had built a rough version of this for Grasshopper-3D, but decided to package it up nicer and put a release together. Hopefully it is something to build upon and the hope was it could serve as a starting point to add more features and functionality to.
+---
 
-The goal was to make Dendro integrate into Grasshopper-3D as seamlessly as possible. Whereas many voxel solutions require you to think of geometry as living with a bounding box, Dendro makes working with volumes no different than handling any other geometry in Grasshopper-3D. Dendro works with many native Grasshopper-3D components, avoiding the 'blocking' found in other plugins, and allowing you to move in and out of volume operations very quickly.
+## Status
 
-## Installation
+- Current focus: build system overhaul and feature development.
+- Expect broken builds, incomplete components, and experimental changes.
+- Do not use this branch for production.
 
-Dendro contains two projects, a C++ project for working with OpenVDB and a C# project creating the Grasshopper-3D plugin.
+---
 
-### DendroAPI (C++)
-OpenVDB and all its dependencies are added to the supplied VCPKG manifest. Upon build, it should automatically download and install everything required.
+## Goals & Features in Development
 
-##### DendroAPI (C++) on MacOS
+### Core & Compatibility
 
-Use Homebrew (`brew`) to install the dependencies for the C++ library:
+- New **CMakePresets + vcpkg** build system with reproducible cross-platform builds.
+- Dependency pinning and automatic versioning.
+- Presets for Windows (x64), macOS Intel, and macOS Apple Silicon.
+- Scripts for bootstrap + prerequisite install.
+- Food4Rhino/GitHub distributables (signed/notarized zips, Yak package, one-click Actions).
+- Component GUID map + automatic upgrader for old → new nodes.
 
-```
-brew install boost cmake c-blosc openvdb tbb zlib
-```
+### Components
 
-Run the following from the DendroAPI directory to compile using `cmake`:
+- **Capsule SDF** – pill primitive.
+- **Tapered Capsule SDF** – variable radii ends.
+- **Tube Complex SDF** – branching tube network.
+- **Dilated Mesh SDF** – mesh→volume conversion with inflation.
 
-```
-mkdir build
-cd build
-cmake ..
-make
-```
+### Meshing
 
-### DendroGH (C#)
-Since there are multiple versions of Rhino, each with their specific SDK, I added the Rhinocommon and Grasshopper-3D libraries as a nuget package in order to let you specifically target your desired Rhino version. That can be changed by `Right-clicking the C# project`, then selecting `Manage Nuget Packages`, clicking the `Installed` tab, `Selecting` your desired package, and finally, changing the `Version` in the right panel.
+- **IsoSurface: VDB Adaptive** – OpenVDB mesher with safe presets, pre-smooth, reprojection.
+- **IsoSurface: Feature-Preserving** – dual contouring (Hermite gradients, libigl path).
 
-It is targeted for Rhino 8 by default.
+### Visualization
 
-##### DendroGH (C#) on MacOS
+- **Integrated OpenGL Preview** – removing need to generate Rhino mesh just for preview purposes.
 
-* Install .Net Core (currently v8, v6+ is required for Apple Silicon) via brew: `brew install dotnet`
-* Compile with `dotnet build DendroGH.Mac.csproj`
+---
 
-## Building
+## Roadmap
 
-Dendro was built using Microsoft Visual Studio 2022, but you should be able to re-target for other versions. It will also copy all necessary dependency dlls into the output folder to provide an easy reference for where dependency dlls can be found. Make sure to build for "Release" and "x64". You will need to bring "DendroGH.gha" and "DendroAPI.dll" into your Grasshopper library folder.
-
-## More Info
-
-Dendro is using OpenVDB. For more information on the library, please visit [here](http://www.openvdb.org/).
-
+- Alpha: core build + basic components online.
+- Beta: full feature set complete and stabilized.
+- Final: merge into `main` as Dendro 2.0.

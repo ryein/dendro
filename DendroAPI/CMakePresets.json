@@ -1,0 +1,95 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 23,
+    "patch": 0
+  },
+  "include": [],
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "environment": {
+        "VCPKG_ROOT": "${sourceDir}/../vcpkg",
+        "VCPKG_TOOLCHAIN": "${sourceDir}/../vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_DISABLE_METRICS": "on",
+        "VCPKG_BINARY_SOURCES": "clear;default;files,${sourceDir}/../.vcpkg_cache,readwrite"
+      },
+      "toolchainFile": "$env{VCPKG_TOOLCHAIN}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BUILD_SHARED_LIBS": "OFF"
+      }
+    },
+    {
+      "name": "win-x64",
+      "displayName": "Windows x64",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/win-x64",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "environment": {
+        "VCPKG_LIBRARY_LINKAGE": "static",
+        "VCPKG_CRT_LINKAGE": "static",
+        "VCPKG_BUILD_TYPE": "release"
+      },
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded",
+        "DENDRO_VERSION_OVERRIDE": "2.0.0"
+      }
+    },
+    {
+      "name": "mac-x64",
+      "displayName": "macOS x64",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/mac-x64",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "environment": {
+        "VCPKG_BUILD_TYPE": "release"
+      },
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-osx",
+        "CMAKE_OSX_ARCHITECTURES": "x86_64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+        "DENDRO_VERSION_OVERRIDE": "2.0.0"
+      }
+    },
+    {
+      "name": "mac-arm64",
+      "displayName": "macOS arm64",
+      "inherits": "base",
+      "binaryDir": "${sourceDir}/build/mac-arm64",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "environment": {
+        "VCPKG_BUILD_TYPE": "release"
+      },
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "arm64-osx",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+        "DENDRO_VERSION_OVERRIDE": "2.0.0"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "win-x64-release", "configurePreset": "win-x64" },
+    { "name": "mac-x64-release", "configurePreset": "mac-x64" },
+    { "name": "mac-arm64-release", "configurePreset": "mac-arm64" }
+  ],
+  "testPresets": []
+}

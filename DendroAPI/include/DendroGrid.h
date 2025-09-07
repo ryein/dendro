@@ -16,7 +16,7 @@ class DendroGrid
 {
 public:
 	DendroGrid();
-	DendroGrid(DendroGrid * grid);
+	DendroGrid(DendroGrid *grid);
 	~DendroGrid();
 
 	openvdb::FloatGrid::Ptr Grid();
@@ -42,15 +42,15 @@ public:
 	void Blend(DendroGrid bGrid, double bPosition, double bEnd);
 	void Blend(DendroGrid bGrid, double bPosition, double bEnd, DendroGrid vMask, double min, double max, bool invert);
 
-	void ClosestPoint(std::vector<openvdb::Vec3R>& points, std::vector<float>& distances);
+	void ClosestPoint(std::vector<openvdb::Vec3R> &points, std::vector<float> &distances);
 
 	DendroMesh Display();
 
 	void UpdateDisplay();
 	void UpdateDisplay(double isovalue, double adaptivity);
 
-	float * GetMeshVertices();
-	int * GetMeshFaces();
+	float *GetMeshVertices();
+	int *GetMeshFaces();
 	int GetVertexCount();
 	int GetFaceCount();
 

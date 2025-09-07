@@ -44,7 +44,7 @@ namespace DendroGH
             get
             {
                 //Return a string identifying you or your company.
-                return "ecr labs";
+                return "ryein";
             }
         }
         public override string AuthorContact
@@ -52,7 +52,7 @@ namespace DendroGH
             get
             {
                 //Return a string representing your preferred contact details.
-                return "dev@ecrlabs.com";
+                return "dendrogh@proton.me";
             }
         }
         public override string Version

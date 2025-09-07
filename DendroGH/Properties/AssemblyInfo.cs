@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("DendroGH")]
 [assembly: AssemblyDescription("volumetric modeling plugin for grasshopper")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("ecr labs")]
+[assembly: AssemblyCompany("ryein")]
 [assembly: AssemblyProduct("DendroGH")]
-[assembly: AssemblyCopyright("Copyright © ecr labs 2018")]
+[assembly: AssemblyCopyright("")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
