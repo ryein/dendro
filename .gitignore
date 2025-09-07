@@ -1,8 +1,12 @@
+#temp
+/docs
+
 # Build outputs
 /build/windows/dev/
 /build/release/*/
 /build/*/
 **/build/
+/dist
 
 # Exclude only generated binaries, keep release folders
 # (allow empty release/ version directories to be committed if desired)
@@ -25,8 +29,7 @@ vcpkg_installed/
 .vcpkg-root
 .vcpkg/
 /vcpkg
-/docs
-/scripts
+
 # Visual Studio (if devs open in VS Folder View)
 .vs/
 *.vcxproj.user
