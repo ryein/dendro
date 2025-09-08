@@ -13,12 +13,12 @@ public:
 	DendroMesh();
 	~DendroMesh();
 
-	DendroMesh Duplicate();
+	DendroMesh Duplicate() const;
 
-	bool IsValid();
+	bool IsValid() const;
 
-	std::vector<openvdb::Vec3s> Vertices();
-	std::vector<openvdb::Vec4I> Faces();
+	const std::vector<openvdb::Vec3s> &Vertices() const;
+	const std::vector<openvdb::Vec4I> &Faces() const;
 
 	void AddVertice(openvdb::Vec3s v);
 	void AddVertice(std::vector<openvdb::Vec3s> v);

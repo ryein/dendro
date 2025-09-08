@@ -92,8 +92,6 @@ DENDRO_API bool DendroFromPoints(DendroGrid *grid, double *vPoints, int pCount, 
 
 DENDRO_API bool DendroFromMesh(DendroGrid *grid, float *vPoints, int vCount, int *vFaces, int fCount, double voxelSize, double bandwidth)
 {
-	double inverseVoxelSize = 1.0 / voxelSize;
-
 	DendroMesh vMesh;
 	vMesh.Clear();
 
@@ -102,8 +100,6 @@ DENDRO_API bool DendroFromMesh(DendroGrid *grid, float *vPoints, int vCount, int
 	{
 
 		openvdb::Vec3s vertex(vPoints[i], vPoints[i + 1], vPoints[i + 2]);
-
-		vertex *= inverseVoxelSize;
 
 		vMesh.AddVertice(vertex);
 

@@ -15,6 +15,8 @@
 DendroGrid::DendroGrid()
 {
 	openvdb::initialize();
+	mVertexCount = 0;
+	mFaceCount = 0;
 }
 
 DendroGrid::DendroGrid(DendroGrid *grid)
@@ -42,11 +44,13 @@ bool DendroGrid::Read(const char *vFile)
 	openvdb::io::File::NameIterator nameIter = file.beginName();
 	if (nameIter == file.endName())
 	{
+		file.close();
 		return false;
 	}
 
 	mGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(nameIter.gridName()));
 
+	file.close();
 	return true;
 }
 
@@ -72,12 +76,24 @@ bool DendroGrid::CreateFromMesh(DendroMesh vMesh, double voxelSize, double bandw
 	openvdb::math::Transform xform;
 	xform.preScale(voxelSize);
 
-	auto vertices = vMesh.Vertices();
-	auto faces = vMesh.Faces();
+	const auto &vertices = vMesh.Vertices();
+	const auto &faces = vMesh.Faces();
 
-	openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(vertices, faces);
-	mGrid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(mesh, xform, static_cast<float>(bandwidth), static_cast<float>(bandwidth), 0, NULL);
+	std::vector<openvdb::Vec3I> triangles;
+	std::vector<openvdb::Vec4I> quads;
+	triangles.reserve(faces.size());
+	quads.reserve(faces.size());
+	for (const auto &f : faces)
+	{
+		if (f[3] < 0)
+			triangles.emplace_back(f[0], f[1], f[2]);
+		else
+			quads.push_back(f);
+	}
 
+	const float halfWidthVox = float(bandwidth / voxelSize);
+	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(
+		xform, vertices, triangles, quads, halfWidthVox);
 	mDisplay = vMesh;
 
 	return true;
@@ -90,7 +106,7 @@ bool DendroGrid::CreateFromPoints(DendroParticle vPoints, double voxelSize, doub
 		return false;
 	}
 
-	mGrid = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, bandwidth);
+	mGrid = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, float(bandwidth / voxelSize));
 	openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid> raster(*mGrid);
 
 	openvdb::math::Transform::Ptr xform = openvdb::math::Transform::createLinearTransform(voxelSize);
@@ -343,10 +359,9 @@ void DendroGrid::UpdateDisplay()
 
 	mDisplay.Clear();
 
-	for (Index64 n = 0, i = 0, N = mesher.pointListSize(); n < N; ++n)
+	for (Index64 n = 0, N = mesher.pointListSize(); n < N; ++n)
 	{
-		auto v = mesher.pointList()[n];
-		mDisplay.AddVertice(v);
+		mDisplay.AddVertice(mesher.pointList()[n]);
 	}
 
 	openvdb::tools::PolygonPoolList &polygonPoolList = mesher.polygonPoolList();
@@ -354,6 +369,7 @@ void DendroGrid::UpdateDisplay()
 	for (Index64 n = 0, N = mesher.polygonPoolListSize(); n < N; ++n)
 	{
 		const openvdb::tools::PolygonPool &polygons = polygonPoolList[n];
+
 		for (Index64 i = 0, I = polygons.numQuads(); i < I; ++i)
 		{
 			auto face = polygons.quad(i);
@@ -373,7 +389,6 @@ void DendroGrid::UpdateDisplay(double isovalue, double adaptivity)
 	openvdb::tools::volumeToMesh<openvdb::FloatGrid>(*mGrid, points, triangles, quads, isovalue, adaptivity);
 
 	mDisplay.Clear();
-
 	mDisplay.AddVertice(points);
 
 	auto begin = triangles.begin();
@@ -396,18 +411,18 @@ void DendroGrid::UpdateDisplay(double isovalue, double adaptivity)
 
 float *DendroGrid::GetMeshVertices()
 {
-	auto vertices = mDisplay.Vertices();
+	const auto &vertices = mDisplay.Vertices();
 
 	mVertexCount = vertices.size() * 3;
 
 	float *verticeArray = reinterpret_cast<float *>(malloc(mVertexCount * sizeof(float)));
 
 	int i = 0;
-	for (auto it = vertices.begin(); it != vertices.end(); ++it)
+	for (const auto &v : vertices)
 	{
-		verticeArray[i] = it->x();
-		verticeArray[i + 1] = it->y();
-		verticeArray[i + 2] = it->z();
+		verticeArray[i] = v.x();
+		verticeArray[i + 1] = v.y();
+		verticeArray[i + 2] = v.z();
 		i += 3;
 	}
 
@@ -416,19 +431,19 @@ float *DendroGrid::GetMeshVertices()
 
 int *DendroGrid::GetMeshFaces()
 {
-	auto faces = mDisplay.Faces();
+	const auto &faces = mDisplay.Faces();
 
 	mFaceCount = faces.size() * 4;
 
 	int *faceArray = reinterpret_cast<int *>(malloc(mFaceCount * sizeof(int)));
 
 	int i = 0;
-	for (auto it = faces.begin(); it != faces.end(); ++it)
+	for (const auto &f : faces)
 	{
-		faceArray[i] = it->w();
-		faceArray[i + 1] = it->x();
-		faceArray[i + 2] = it->y();
-		faceArray[i + 3] = it->z();
+		faceArray[i] = f.w();
+		faceArray[i + 1] = f.x();
+		faceArray[i + 2] = f.y();
+		faceArray[i + 3] = f.z();
 		i += 4;
 	}
 

@@ -6,7 +6,7 @@ DendroMesh::DendroMesh()
 	mFaces.clear();
 }
 
-DendroMesh DendroMesh::Duplicate()
+DendroMesh DendroMesh::Duplicate() const
 {
 	DendroMesh mesh;
 	mesh.AddVertice(mVertices);
@@ -15,11 +15,9 @@ DendroMesh DendroMesh::Duplicate()
 	return mesh;
 }
 
-DendroMesh::~DendroMesh()
-{
-}
+DendroMesh::~DendroMesh() {}
 
-bool DendroMesh::IsValid()
+bool DendroMesh::IsValid() const
 {
 	if (mFaces.size() > 0 && mVertices.size() > 0)
 	{
@@ -29,12 +27,12 @@ bool DendroMesh::IsValid()
 	return false;
 }
 
-std::vector<openvdb::Vec3s> DendroMesh::Vertices()
+const std::vector<openvdb::Vec3s> &DendroMesh::Vertices() const
 {
 	return mVertices;
 }
 
-std::vector<openvdb::Vec4I> DendroMesh::Faces()
+const std::vector<openvdb::Vec4I> &DendroMesh::Faces() const
 {
 	return mFaces;
 }
