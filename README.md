@@ -24,6 +24,7 @@ If you are looking for a usable version of Dendro, please switch to the `main` b
 - Scripts for bootstrap + prerequisite install.
 - Food4Rhino/GitHub distributables (signed/notarized zips, Yak package, one-click Actions).
 - Component GUID map + automatic upgrader for old → new nodes.
+- Clean up P/Invoke logic and implement performance tweaks
 
 ### Components
 
