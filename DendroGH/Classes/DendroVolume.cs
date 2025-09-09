@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.Marshalling;
 using Rhino.Geometry;
 
 namespace DendroGH {
@@ -13,6 +14,9 @@ namespace DendroGH {
     /// specific functions on that c++ mGrid class
     /// </summary>
     public class DendroVolume : IDisposable {
+
+[StructLayout(LayoutKind.Sequential)]
+struct DendroPoint { public double X, Y, Z; }
 
 #region PInvokes
         #if UNIX
@@ -62,7 +66,7 @@ namespace DendroGH {
         #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
         #endif
-        static private extern bool DendroFromPoints(IntPtr grid, double[] points, int pCount, double[] radii, int rCount, double voxelSize, double bandwidth);
+        static extern bool DendroFromPoints( IntPtr grid, IntPtr pts, nuint count, [In] double[] radii, int rCount, double voxelSize, double bandwidth);
 
         #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
@@ -438,48 +442,44 @@ namespace DendroGH {
         /// <returns>boolean value for whether volume was built successfully</returns>
         public bool CreateFromPoints (List<Point3d> vPoints, List<double> vRadius, DendroSettings vSettings) {
             // there were no points/radius supplied so exit
-            if (vPoints.Count == 0 || vRadius.Count == 0)
-                return false;
+            if (vPoints.Count == 0 || vRadius.Count == 0) return false;
 
             // check for invalid voxelsize settings
-            if (vSettings.VoxelSize < 0.01)
-                vSettings.VoxelSize = 0.01;
+            if (vSettings.VoxelSize < 0.01) vSettings.VoxelSize = 0.01;
 
             // check for invalid bandwidth settings
-            if (vSettings.Bandwidth < 1)
-                vSettings.Bandwidth = 1;
+            if (vSettings.Bandwidth < 1) vSettings.Bandwidth = 1;
 
             // if one or equal radius values were supplied then build volume
             if (vPoints.Count == vRadius.Count || vRadius.Count == 1) {
 
-                // create point array from point3d list so we can pass to c++
-                double[] points = new double[vPoints.Count * 3];
+                // create radius array from list so we can pass to c++
+                double[] radius = vRadius.ToArray();
 
-                int i = 0;
-                foreach (Point3d pt in vPoints) {
-                    points[i] = pt.X;
-                    points[i + 1] = pt.Y;
-                    points[i + 2] = pt.Z;
+                // Get a span view over the list’s backing array
+                var span = CollectionsMarshal.AsSpan(vPoints);   
 
-                    i += 3;
+                // Reinterpret as our DendroPoint layout (three doubles)
+                var dspan = MemoryMarshal.Cast<Point3d, DendroPoint>(span);
+
+                unsafe
+                {
+                    fixed (DendroPoint* p = dspan)
+                    {
+
+                        
+                        this.IsValid = DendroFromPoints(this.Grid, (IntPtr)p, (nuint)dspan.Length, radius, radius.Length, vSettings.VoxelSize, vSettings.Bandwidth);
+                        
+                        if (!this.IsValid)return false;
+
+                        this.UpdateDisplay ();
+                        return true;
+                    }
                 }
 
-                // create radius array from list so we can pass to c++
-                double[] radius = vRadius.ToArray ();
-
-                // pinvoke build volume from points
-                this.IsValid = DendroFromPoints(this.Grid, points, points.Length, radius, radius.Length, vSettings.VoxelSize, vSettings.Bandwidth);
-
-                if (!this.IsValid)
-                    return false;
-
-                this.UpdateDisplay ();
-            }
-            else {
-                return false;
             }
 
-            return true;
+            return false;
         }
 
         /// <summary>

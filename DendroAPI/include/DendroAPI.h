@@ -7,6 +7,12 @@
 extern "C"
 {
 #endif
+
+	struct DendroPoint
+	{
+		double x, y, z;
+	};
+
 	// ovdb volume class constructors
 	extern DENDRO_API DendroGrid *DendroCreate();
 	extern DENDRO_API void DendroDelete(DendroGrid *grid);
@@ -16,7 +22,7 @@ extern "C"
 	extern DENDRO_API bool DendroWrite(DendroGrid *grid, const char *filename);
 
 	// volume conversion methods
-	extern DENDRO_API bool DendroFromPoints(DendroGrid *grid, double *vPoints, int pCount, double *vRadius, int rCount, double voxelSize, double bandwidth);
+	extern DENDRO_API bool DendroFromPoints(DendroGrid *grid, const DendroPoint *vPoints, size_t pCount, const double *vRadius, int rCount, double voxelSize, double bandwidth);
 	extern DENDRO_API bool DendroFromMesh(DendroGrid *grid, float *vPoints, int vCount, int *vFaces, int fCount, double voxelSize, double bandwidth);
 
 	// volume render methods

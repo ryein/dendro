@@ -39,22 +39,28 @@ DENDRO_API bool DendroWrite(DendroGrid *grid, const char *filename)
 }
 
 // grid conversion methods
-DENDRO_API bool DendroFromPoints(DendroGrid *grid, double *vPoints, int pCount, double *vRadius, int rCount, double voxelSize, double bandwidth)
+DENDRO_API bool DendroFromPoints(DendroGrid *grid, const DendroPoint *vPoints, size_t pCount, const double *vRadius, int rCount, double voxelSize, double bandwidth)
 {
-	double inverseVoxelSize = 1.0 / voxelSize;
-
 	std::vector<openvdb::Vec3R> particleList;
+	particleList.reserve(pCount);
 
-	int i = 0;
-	while (i < pCount)
+	if constexpr (std::is_same_v<openvdb::Real, double>)
 	{
-		double x = vPoints[i];	   // *inverseVoxelSize;
-		double y = vPoints[i + 1]; // * inverseVoxelSize;
-		double z = vPoints[i + 2]; // * inverseVoxelSize;
-
-		particleList.push_back(openvdb::Vec3R(x, y, z));
-
-		i += 3;
+		// Real == double → layouts match (3 doubles) → memcpy
+		particleList.resize(pCount);
+		std::memcpy(particleList.data(), vPoints, pCount * sizeof(DendroPoint));
+	}
+	else
+	{
+		// Real == float → single pass cast
+		for (size_t i = 0; i < pCount; ++i)
+		{
+			const auto &q = vPoints[i];
+			particleList.emplace_back(
+				openvdb::Real(q.x),
+				openvdb::Real(q.y),
+				openvdb::Real(q.z));
+		}
 	}
 
 	DendroParticle ps;
