@@ -15,15 +15,12 @@
 DendroGrid::DendroGrid()
 {
 	openvdb::initialize();
-	mVertexCount = 0;
-	mFaceCount = 0;
 }
 
 DendroGrid::DendroGrid(DendroGrid *grid)
 {
 	openvdb::initialize();
 	mGrid = grid->Grid()->deepCopy();
-	mDisplay = grid->Display().Duplicate();
 }
 
 DendroGrid::~DendroGrid()
@@ -94,7 +91,6 @@ bool DendroGrid::CreateFromMesh(DendroMesh vMesh, double voxelSize, double bandw
 	const float halfWidthVox = float(bandwidth / voxelSize);
 	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(
 		xform, vertices, triangles, quads, halfWidthVox);
-	mDisplay = vMesh;
 
 	return true;
 }
@@ -343,119 +339,4 @@ void DendroGrid::ClosestPoint(std::vector<openvdb::Vec3R> &points, std::vector<f
 {
 	auto csp = openvdb::tools::ClosestSurfacePoint<openvdb::FloatGrid>::create(*mGrid);
 	csp->searchAndReplace(points, distances);
-}
-
-DendroMesh DendroGrid::Display()
-{
-	return mDisplay;
-}
-
-void DendroGrid::UpdateDisplay()
-{
-	using openvdb::Index64;
-
-	openvdb::tools::VolumeToMesh mesher(mGrid->getGridClass() == openvdb::GRID_LEVEL_SET ? 0.0 : 0.01);
-	mesher(*mGrid);
-
-	mDisplay.Clear();
-
-	for (Index64 n = 0, N = mesher.pointListSize(); n < N; ++n)
-	{
-		mDisplay.AddVertice(mesher.pointList()[n]);
-	}
-
-	openvdb::tools::PolygonPoolList &polygonPoolList = mesher.polygonPoolList();
-
-	for (Index64 n = 0, N = mesher.polygonPoolListSize(); n < N; ++n)
-	{
-		const openvdb::tools::PolygonPool &polygons = polygonPoolList[n];
-
-		for (Index64 i = 0, I = polygons.numQuads(); i < I; ++i)
-		{
-			auto face = polygons.quad(i);
-			mDisplay.AddFace(face);
-		}
-	}
-}
-
-void DendroGrid::UpdateDisplay(double isovalue, double adaptivity)
-{
-	isovalue /= mGrid->voxelSize().x();
-
-	std::vector<openvdb::Vec3s> points;
-	std::vector<openvdb::Vec4I> quads;
-	std::vector<openvdb::Vec3I> triangles;
-
-	openvdb::tools::volumeToMesh<openvdb::FloatGrid>(*mGrid, points, triangles, quads, isovalue, adaptivity);
-
-	mDisplay.Clear();
-	mDisplay.AddVertice(points);
-
-	auto begin = triangles.begin();
-	auto end = triangles.end();
-
-	for (auto it = begin; it != end; ++it)
-	{
-		int w = -1;
-		int x = it->x();
-		int y = it->y();
-		int z = it->z();
-
-		openvdb::Vec4I face(x, y, z, w);
-
-		mDisplay.AddFace(face);
-	}
-
-	mDisplay.AddFace(quads);
-}
-
-float *DendroGrid::GetMeshVertices()
-{
-	const auto &vertices = mDisplay.Vertices();
-
-	mVertexCount = vertices.size() * 3;
-
-	float *verticeArray = reinterpret_cast<float *>(malloc(mVertexCount * sizeof(float)));
-
-	int i = 0;
-	for (const auto &v : vertices)
-	{
-		verticeArray[i] = v.x();
-		verticeArray[i + 1] = v.y();
-		verticeArray[i + 2] = v.z();
-		i += 3;
-	}
-
-	return verticeArray;
-}
-
-int *DendroGrid::GetMeshFaces()
-{
-	const auto &faces = mDisplay.Faces();
-
-	mFaceCount = faces.size() * 4;
-
-	int *faceArray = reinterpret_cast<int *>(malloc(mFaceCount * sizeof(int)));
-
-	int i = 0;
-	for (const auto &f : faces)
-	{
-		faceArray[i] = f.w();
-		faceArray[i + 1] = f.x();
-		faceArray[i + 2] = f.y();
-		faceArray[i + 3] = f.z();
-		i += 4;
-	}
-
-	return faceArray;
-}
-
-int DendroGrid::GetVertexCount()
-{
-	return mVertexCount;
-}
-
-int DendroGrid::GetFaceCount()
-{
-	return mFaceCount;
 }

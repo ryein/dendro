@@ -44,21 +44,8 @@ public:
 
 	void ClosestPoint(std::vector<openvdb::Vec3R> &points, std::vector<float> &distances);
 
-	DendroMesh Display();
-
-	void UpdateDisplay();
-	void UpdateDisplay(double isovalue, double adaptivity);
-
-	float *GetMeshVertices();
-	int *GetMeshFaces();
-	int GetVertexCount();
-	int GetFaceCount();
-
 private:
 	openvdb::FloatGrid::Ptr mGrid;
-	DendroMesh mDisplay;
-	int mFaceCount;
-	int mVertexCount;
 };
 
 #endif // __DENDROGRID_H__

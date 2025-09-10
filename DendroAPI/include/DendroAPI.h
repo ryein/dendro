@@ -25,13 +25,6 @@ extern "C"
 	extern DENDRO_API bool DendroFromPoints(DendroGrid *grid, const DendroPoint *vPoints, size_t pCount, const double *vRadius, int rCount, double voxelSize, double bandwidth);
 	extern DENDRO_API bool DendroFromMesh(DendroGrid *grid, float *vPoints, int vCount, int *vFaces, int fCount, double voxelSize, double bandwidth);
 
-	// volume render methods
-	extern DENDRO_API void DendroToMesh(DendroGrid *grid);
-	extern DENDRO_API void DendroToMeshSettings(DendroGrid *grid, double isovalue, double adaptivity);
-
-	extern DENDRO_API float *DendroVertexBuffer(DendroGrid *grid, int *size);
-	extern DENDRO_API int *DendroFaceBuffer(DendroGrid *grid, int *size);
-
 	// volume transformation methods
 	extern DENDRO_API bool DendroTransform(DendroGrid *grid, double *matrix, int mCount);
 

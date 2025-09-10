@@ -124,35 +124,6 @@ DENDRO_API bool DendroFromMesh(DendroGrid *grid, float *vPoints, int vCount, int
 	return grid->CreateFromMesh(vMesh, voxelSize, bandwidth);
 }
 
-// grid render methods
-DENDRO_API void DendroToMesh(DendroGrid *grid)
-{
-	grid->UpdateDisplay();
-}
-
-DENDRO_API void DendroToMeshSettings(DendroGrid *grid, double isovalue, double adaptivity)
-{
-	grid->UpdateDisplay(isovalue, adaptivity);
-}
-
-DENDRO_API float *DendroVertexBuffer(DendroGrid *grid, int *size)
-{
-	float *verticeArray = grid->GetMeshVertices();
-
-	*size = grid->GetVertexCount();
-
-	return verticeArray;
-}
-
-DENDRO_API int *DendroFaceBuffer(DendroGrid *grid, int *size)
-{
-	int *faceArray = grid->GetMeshFaces();
-
-	*size = grid->GetFaceCount();
-
-	return faceArray;
-}
-
 // grid transformation methods
 DENDRO_API bool DendroTransform(DendroGrid *grid, double *matrix, int mCount)
 {

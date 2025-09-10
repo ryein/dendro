@@ -27,6 +27,7 @@ CTestTestfile.cmake
 # vcpkg build artifacts
 vcpkg_installed/
 .vcpkg-root
+.vcpkg-cache
 .vcpkg/
 /vcpkg
 
