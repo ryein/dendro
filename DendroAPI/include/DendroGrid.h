@@ -24,8 +24,9 @@ public:
 	bool Read(const char *vFile);
 	bool Write(const char *vFile);
 
-	bool CreateFromMesh(DendroMesh vMesh, double voxelSize, double bandwidth);
 	bool CreateFromPoints(DendroParticle vPoints, double voxelSize, double bandwidth);
+	bool CreateFromMesh(const std::vector<openvdb::Vec3d> &vertices, const std::vector<openvdb::Vec3I> &triangles, const std::vector<openvdb::Vec4I> &quads, double voxelSize, double bandwidth);
+	void ToMesh(std::vector<openvdb::Vec3d> &vertices, std::vector<openvdb::Vec3I> &triangles, std::vector<openvdb::Vec4I> &quads, double isovalue, double adaptivity);
 
 	void Transform(openvdb::math::Mat4d xform);
 

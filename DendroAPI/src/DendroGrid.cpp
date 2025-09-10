@@ -9,7 +9,7 @@
 #include <openvdb/tools/ParticlesToLevelSet.h>
 #include <openvdb/Types.h>
 #include <openvdb/tools/VolumeToSpheres.h>
-
+#include <vector>
 #include <cmath>
 
 DendroGrid::DendroGrid()
@@ -63,34 +63,25 @@ bool DendroGrid::Write(const char *vFile)
 	return true;
 }
 
-bool DendroGrid::CreateFromMesh(DendroMesh vMesh, double voxelSize, double bandwidth)
+bool DendroGrid::CreateFromMesh(const std::vector<openvdb::Vec3d> &vertices, const std::vector<openvdb::Vec3I> &triangles, const std::vector<openvdb::Vec4I> &quads, double voxelSize, double bandwidth)
 {
-	if (!vMesh.IsValid())
+	// Convert double vertices to float
+	std::vector<openvdb::Vec3s> fPoints;
+	fPoints.reserve(vertices.size());
+	for (const auto &v : vertices)
 	{
-		return false;
+		fPoints.emplace_back(
+			static_cast<float>(v.x()),
+			static_cast<float>(v.y()),
+			static_cast<float>(v.z()));
 	}
 
 	openvdb::math::Transform xform;
 	xform.preScale(voxelSize);
 
-	const auto &vertices = vMesh.Vertices();
-	const auto &faces = vMesh.Faces();
+	const float halfWidthVox = static_cast<float>(bandwidth / voxelSize);
 
-	std::vector<openvdb::Vec3I> triangles;
-	std::vector<openvdb::Vec4I> quads;
-	triangles.reserve(faces.size());
-	quads.reserve(faces.size());
-	for (const auto &f : faces)
-	{
-		if (f[3] < 0)
-			triangles.emplace_back(f[0], f[1], f[2]);
-		else
-			quads.push_back(f);
-	}
-
-	const float halfWidthVox = float(bandwidth / voxelSize);
-	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(
-		xform, vertices, triangles, quads, halfWidthVox);
+	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(xform, fPoints, triangles, quads, halfWidthVox);
 
 	return true;
 }
@@ -113,6 +104,21 @@ bool DendroGrid::CreateFromPoints(DendroParticle vPoints, double voxelSize, doub
 	raster.finalize();
 
 	return true;
+}
+
+void DendroGrid::ToMesh(std::vector<openvdb::Vec3d> &vertices, std::vector<openvdb::Vec3I> &triangles, std::vector<openvdb::Vec4I> &quads, double isovalue, double adaptivity)
+{
+	std::vector<openvdb::Vec3s> fPoints;
+	triangles.clear();
+	quads.clear();
+
+	openvdb::tools::volumeToMesh(*mGrid, fPoints, triangles, quads, isovalue, adaptivity);
+	vertices.resize(fPoints.size());
+	for (size_t i = 0; i < fPoints.size(); ++i)
+	{
+		const auto &p = fPoints[i];
+		vertices[i] = openvdb::Vec3d(double(p.x()), double(p.y()), double(p.z()));
+	}
 }
 
 void DendroGrid::Transform(openvdb::math::Mat4d xform)

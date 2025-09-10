@@ -5,6 +5,8 @@
 #include "DendroMesh.h"
 #include <openvdb/util/Util.h>
 #include <vector>
+#include <cstdlib>
+#include <cstring>
 
 // grid class constructors
 DENDRO_API DendroGrid *DendroCreate()
@@ -39,7 +41,7 @@ DENDRO_API bool DendroWrite(DendroGrid *grid, const char *filename)
 }
 
 // grid conversion methods
-DENDRO_API bool DendroFromPoints(DendroGrid *grid, const DendroPoint *vPoints, size_t pCount, const double *vRadius, int rCount, double voxelSize, double bandwidth)
+DENDRO_API bool DendroFromPoints(DendroGrid *grid, const NativePoint *vPoints, size_t pCount, const double *vRadius, int rCount, double voxelSize, double bandwidth)
 {
 	std::vector<openvdb::Vec3R> particleList;
 	particleList.reserve(pCount);
@@ -48,7 +50,7 @@ DENDRO_API bool DendroFromPoints(DendroGrid *grid, const DendroPoint *vPoints, s
 	{
 		// Real == double → layouts match (3 doubles) → memcpy
 		particleList.resize(pCount);
-		std::memcpy(particleList.data(), vPoints, pCount * sizeof(DendroPoint));
+		std::memcpy(particleList.data(), vPoints, pCount * sizeof(NativePoint));
 	}
 	else
 	{
@@ -96,32 +98,93 @@ DENDRO_API bool DendroFromPoints(DendroGrid *grid, const DendroPoint *vPoints, s
 	return grid->CreateFromPoints(ps, voxelSize, bandwidth);
 }
 
-DENDRO_API bool DendroFromMesh(DendroGrid *grid, float *vPoints, int vCount, int *vFaces, int fCount, double voxelSize, double bandwidth)
+DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int vCount, const NativeFace *vFaces, int fCount, double voxelSize, double bandwidth)
 {
-	DendroMesh vMesh;
-	vMesh.Clear();
+	if (!grid || !vPoints || !vFaces)
+		return false;
 
-	int i = 0;
-	while (i < vCount)
+	std::vector<openvdb::Vec3d> vertices(vCount);
+	std::memcpy(vertices.data(), vPoints, vCount * sizeof(NativePoint));
+
+	std::vector<openvdb::Vec3I> triangles;
+	triangles.reserve(fCount);
+	for (int i = 0; i < fCount; ++i)
 	{
-
-		openvdb::Vec3s vertex(vPoints[i], vPoints[i + 1], vPoints[i + 2]);
-
-		vMesh.AddVertice(vertex);
-
-		i += 3;
+		const auto &f = vFaces[i];
+		triangles.emplace_back(f.a, f.b, f.c);
 	}
 
-	i = 0;
-	while (i < fCount)
-	{
-		openvdb::Vec4I face(vFaces[i], vFaces[i + 1], vFaces[i + 2], openvdb::util::INVALID_IDX);
+	std::vector<openvdb::Vec4I> quads;
 
-		vMesh.AddFace(face);
-		i += 3;
+	return grid->CreateFromMesh(vertices, triangles, quads, voxelSize, bandwidth);
+}
+
+DENDRO_API bool DendroToMesh(DendroGrid *grid, NativePoint **vPoints, int *vCount, NativeFace **vFaces, int *fCount, double isovalue, double adaptivity)
+{
+	if (!grid || !vPoints || !vCount || !vFaces || !fCount)
+		return false;
+
+	std::vector<openvdb::Vec3d> vertices;
+	std::vector<openvdb::Vec3I> triangles;
+	std::vector<openvdb::Vec4I> quads;
+
+	grid->ToMesh(vertices, triangles, quads, isovalue, adaptivity);
+
+	size_t vertCount = vertices.size();
+	size_t triCount = triangles.size() + quads.size() * 2;
+
+	NativePoint *pVerts = reinterpret_cast<NativePoint *>(malloc(vertCount * sizeof(NativePoint)));
+	NativeFace *pFaces = reinterpret_cast<NativeFace *>(malloc(triCount * sizeof(NativeFace)));
+
+	if (!pVerts || !pFaces)
+	{
+		free(pVerts);
+		free(pFaces);
+		return false;
 	}
 
-	return grid->CreateFromMesh(vMesh, voxelSize, bandwidth);
+	for (size_t i = 0; i < vertices.size(); ++i)
+	{
+		const auto &v = vertices[i];
+		pVerts[i].x = v.x();
+		pVerts[i].y = v.y();
+		pVerts[i].z = v.z();
+	}
+
+	size_t idx = 0;
+	for (const auto &t : triangles)
+	{
+		pFaces[idx].a = t[0];
+		pFaces[idx].b = t[1];
+		pFaces[idx].c = t[2];
+		++idx;
+	}
+	for (const auto &q : quads)
+	{
+		pFaces[idx].a = q[0];
+		pFaces[idx].b = q[1];
+		pFaces[idx].c = q[2];
+		++idx;
+		pFaces[idx].a = q[0];
+		pFaces[idx].b = q[2];
+		pFaces[idx].c = q[3];
+		++idx;
+	}
+
+	*vPoints = pVerts;
+	*vFaces = pFaces;
+	*vCount = static_cast<int>(vertCount);
+	*fCount = static_cast<int>(triCount);
+
+	return true;
+}
+
+DENDRO_API void DendroFree(void *ptr)
+{
+	if (ptr != nullptr)
+	{
+		free(ptr);
+	}
 }
 
 // grid transformation methods

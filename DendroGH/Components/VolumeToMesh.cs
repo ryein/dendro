@@ -50,9 +50,9 @@ namespace DendroGH
                 return;
             }
 
-            Mesh mesh = new Mesh();
+            Mesh m = mVolume.ToMesh(vSettings);
 
-            DA.SetData(0, mesh);
+            DA.SetData(0, m);
         }
 
         /// <summary>

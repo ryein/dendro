@@ -18,7 +18,10 @@ namespace DendroGH
     {
 
         [StructLayout(LayoutKind.Sequential)]
-        struct DendroPoint { public double X, Y, Z; }
+        struct NativePoint { public double X, Y, Z; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct NativeFace { public int A, B, C; }
 
         #region PInvokes
 #if UNIX
@@ -61,8 +64,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
-        static private extern bool DendroFromMesh(IntPtr grid, float[] vertices, int vCount, int[] faces, int fCount, double voxelSize, double bandwidth);
-
+        static private extern bool DendroFromMesh(IntPtr grid, [In] NativePoint[] vertices, int vCount, [In] NativeFace[] faces, int fCount, double voxelSize, double bandwidth);
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
 #else
@@ -75,7 +77,14 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
-        static private extern void DendroToMesh(IntPtr grid);
+        static private extern bool DendroToMesh(IntPtr grid, out IntPtr vertices, out int vCount, out IntPtr faces, out int fCount, double isovalue, double adaptivity);
+
+#if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+#else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+#endif
+        static private extern void DendroFree(IntPtr ptr);
 
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
@@ -401,11 +410,24 @@ namespace DendroGH
             if (vSettings.Bandwidth < 1)
                 vSettings.Bandwidth = 1;
 
-            // create flattened vertex and face arrays from input mesh
-            float[] vertices = vMesh.Vertices.ToFloatArray();
-            int[] faces = vMesh.Faces.ToIntArray(true);
+            int vCount = vMesh.Vertices.Count;
 
-            // pinvoke build volume from mesh
+            NativePoint[] vertices = new NativePoint[vCount];
+            for (int i = 0; i < vCount; ++i)
+            {
+                var p = vMesh.Vertices[i];
+                vertices[i] = new NativePoint { X = p.X, Y = p.Y, Z = p.Z };
+            }
+
+            var faceList = new List<NativeFace>(vMesh.Faces.Count);
+            foreach (var f in vMesh.Faces)
+            {
+                faceList.Add(new NativeFace { A = f.A, B = f.B, C = f.C });
+                if (f.IsQuad)
+                    faceList.Add(new NativeFace { A = f.A, B = f.C, C = f.D });
+            }
+
+            var faces = faceList.ToArray();
             this.IsValid = DendroFromMesh(this.Grid, vertices, vertices.Length, faces, faces.Length, vSettings.VoxelSize, vSettings.Bandwidth);
 
             if (!this.IsValid)
@@ -413,6 +435,55 @@ namespace DendroGH
 
             return true;
         }
+
+
+        /// <summary>
+        /// generate a mesh from the current volume
+        /// </summary>
+        /// <returns>mesh representation or null if conversion failed</returns>
+        public Mesh ToMesh(DendroSettings vSettings)
+        {
+            if (!this.IsValid)
+                return null;
+
+            bool ok;
+            IntPtr vPtr, fPtr;
+            int vCount, fCount;
+
+            ok = DendroToMesh(this.Grid, out vPtr, out vCount, out fPtr, out fCount, vSettings.IsoValue, vSettings.Adaptivity);
+
+            if (!ok)
+                return null;
+
+            try
+            {
+                Mesh mesh = new Mesh();
+
+                unsafe
+                {
+
+                    var vSpan = new ReadOnlySpan<NativePoint>(vPtr.ToPointer(), vCount);
+                    var fSpan = new ReadOnlySpan<NativeFace>(fPtr.ToPointer(), fCount);
+
+                    for (int i = 0; i < vCount; ++i)
+                        mesh.Vertices.Add(vSpan[i].X, vSpan[i].Y, vSpan[i].Z);
+
+                    for (int i = 0; i < fCount; ++i)
+                        mesh.Faces.AddFace(fSpan[i].A, fSpan[i].B, fSpan[i].C);
+
+                }
+
+                mesh.Normals.ComputeNormals();
+                mesh.Compact();
+                return mesh;
+            }
+            finally
+            {
+                DendroFree(vPtr);
+                DendroFree(fPtr);
+            }
+        }
+
 
         /// <summary>
         /// build a volume from a supplied list of points
@@ -444,11 +515,11 @@ namespace DendroGH
                 var span = CollectionsMarshal.AsSpan(vPoints);
 
                 // Reinterpret as our DendroPoint layout (three doubles)
-                var dspan = MemoryMarshal.Cast<Point3d, DendroPoint>(span);
+                var dspan = MemoryMarshal.Cast<Point3d, NativePoint>(span);
 
                 unsafe
                 {
-                    fixed (DendroPoint* p = dspan)
+                    fixed (NativePoint* p = dspan)
                     {
 
 
