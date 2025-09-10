@@ -57,6 +57,17 @@ function Assert-Vcpkg {
     if (-not (Test-Path $toolchain)) { throw "vcpkg toolchain not found: $toolchain" }
     $env:VCPKG_ROOT = $VcpkgDir
     $env:VCPKG_TOOLCHAIN = $toolchain
+
+    # Read baselines from both files (if present)
+    $cfg = Get-Content (Join-Path $ApiDir 'vcpkg-configuration.json') -Raw | ConvertFrom-Json
+    $baseline = $cfg.'default-registry'.baseline
+
+    if ($baseline -and -not (git -C $VcpkgDir rev-parse --verify $baseline 2>$null)) {
+        throw "vcpkg: baseline $baseline not found after fetch."
+    }
+    if ($baseline -and -not (git -C $VcpkgDir show "$baseline`:versions/baseline.json" 2>$null)) {
+        throw "vcpkg: baseline $baseline is too old (missing versions/baseline.json). Update the baseline in vcpkg-configuration.json."
+    }
 }
 
 # --- Compute release version from -Version or latest git tag

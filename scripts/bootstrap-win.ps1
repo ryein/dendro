@@ -189,7 +189,29 @@ foreach ($t in 'cmake', 'ninja', 'git', 'dotnet') { Assert-Tool $t }
 
 # --- Bootstrap vcpkg
 $VcpkgDir = Join-Path $RepoRoot 'vcpkg'
-if (-not (Test-Path $VcpkgDir)) { throw "Expected vcpkg at $VcpkgDir. Clone it there first." }
+if (-not (Test-Path $VcpkgDir)) {
+  Write-Host "vcpkg not found at $VcpkgDir → cloning..."
+  git --version *> $null
+  if ($LASTEXITCODE -ne 0) { throw "Git not found; install Git first." }
+  & git clone --depth 1 https://github.com/microsoft/vcpkg $VcpkgDir
+  if ($LASTEXITCODE -ne 0) { throw "Failed to clone vcpkg into $VcpkgDir." }
+}
+
+# If the repo is shallow, make it a full clone so pinned baselines exist
+$gitDir = Join-Path $VcpkgDir '.git'
+$shallowFile = Join-Path $gitDir 'shallow'
+if (Test-Path $gitDir) {
+  if (Test-Path $shallowFile) {
+    Step "Converting vcpkg to a full clone (needed for builtin baselines)"
+    & git -C $VcpkgDir fetch origin --prune --tags --unshallow
+    if ($LASTEXITCODE -ne 0) { throw "Failed to unshallow vcpkg repository." }
+    Ok "vcpkg repository is now a full clone."
+  } else {
+    # Still refresh tags/remote state to ensure baseline/tag availability
+    & git -C $VcpkgDir fetch origin --prune --tags
+    if ($LASTEXITCODE -ne 0) { throw "Failed to fetch tags for vcpkg repository." }
+  }
+}
 
 $bootstrapBat = Join-Path $VcpkgDir 'bootstrap-vcpkg.bat'
 if (-not (Test-Path $bootstrapBat)) { throw "Missing $bootstrapBat" }
@@ -197,9 +219,9 @@ if (-not (Test-Path $bootstrapBat)) { throw "Missing $bootstrapBat" }
 Step "Bootstrapping vcpkg at $VcpkgDir"
 Push-Location $VcpkgDir
 try {
-    & $bootstrapBat -disableMetrics | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed with exit code $LASTEXITCODE." }
-    Ok "vcpkg bootstrapped."
+  & $bootstrapBat -disableMetrics | ForEach-Object { Write-Host $_ }
+  if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed with exit code $LASTEXITCODE." }
+  Ok "vcpkg bootstrapped."
 }
 finally { Pop-Location }
 

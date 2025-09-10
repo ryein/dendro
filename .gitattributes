@@ -18,7 +18,7 @@ vcpkg-configuration.json text
 *.txt text
 *.json text
 *.sh text
-*.ps1 text eol=crlf   # allow PowerShell scripts to have CRLF if needed
+*.ps1 text
 
 # Binary artifacts: always binary, no diff
 *.dll  binary
