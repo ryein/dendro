@@ -63,25 +63,14 @@ bool DendroGrid::Write(const char *vFile)
 	return true;
 }
 
-bool DendroGrid::CreateFromMesh(const std::vector<openvdb::Vec3d> &vertices, const std::vector<openvdb::Vec3I> &triangles, const std::vector<openvdb::Vec4I> &quads, double voxelSize, double bandwidth)
+bool DendroGrid::FromMesh(const std::vector<openvdb::Vec3s> &vertices, const std::vector<openvdb::Vec3I> &triangles, const std::vector<openvdb::Vec4I> &quads, double voxelSize, double bandwidth)
 {
-	// Convert double vertices to float
-	std::vector<openvdb::Vec3s> fPoints;
-	fPoints.reserve(vertices.size());
-	for (const auto &v : vertices)
-	{
-		fPoints.emplace_back(
-			static_cast<float>(v.x()),
-			static_cast<float>(v.y()),
-			static_cast<float>(v.z()));
-	}
-
 	openvdb::math::Transform xform;
 	xform.preScale(voxelSize);
 
 	const float halfWidthVox = static_cast<float>(bandwidth / voxelSize);
 
-	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(xform, fPoints, triangles, quads, halfWidthVox);
+	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(xform, vertices, triangles, quads, halfWidthVox);
 
 	return true;
 }
@@ -106,19 +95,9 @@ bool DendroGrid::CreateFromPoints(DendroParticle vPoints, double voxelSize, doub
 	return true;
 }
 
-void DendroGrid::ToMesh(std::vector<openvdb::Vec3d> &vertices, std::vector<openvdb::Vec3I> &triangles, std::vector<openvdb::Vec4I> &quads, double isovalue, double adaptivity)
+void DendroGrid::ToMesh(std::vector<openvdb::Vec3s> &vertices, std::vector<openvdb::Vec3I> &triangles, std::vector<openvdb::Vec4I> &quads, double isovalue, double adaptivity)
 {
-	std::vector<openvdb::Vec3s> fPoints;
-	triangles.clear();
-	quads.clear();
-
-	openvdb::tools::volumeToMesh(*mGrid, fPoints, triangles, quads, isovalue, adaptivity);
-	vertices.resize(fPoints.size());
-	for (size_t i = 0; i < fPoints.size(); ++i)
-	{
-		const auto &p = fPoints[i];
-		vertices[i] = openvdb::Vec3d(double(p.x()), double(p.y()), double(p.z()));
-	}
+	openvdb::tools::volumeToMesh<openvdb::FloatGrid>(*mGrid, vertices, triangles, quads, isovalue, adaptivity);
 }
 
 void DendroGrid::Transform(openvdb::math::Mat4d xform)

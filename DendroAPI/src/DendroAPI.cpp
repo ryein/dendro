@@ -100,23 +100,49 @@ DENDRO_API bool DendroFromPoints(DendroGrid *grid, const NativePoint *vPoints, s
 
 DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int vCount, const NativeFace *vFaces, int fCount, double voxelSize, double bandwidth)
 {
-	if (!grid || !vPoints || !vFaces)
-		return false;
+	// vertices
+	static_assert(std::is_trivially_copyable<openvdb::Vec3f>::value, "Vec3f must be trivially copyable");
+	static_assert(sizeof(openvdb::Vec3f) == sizeof(NativePoint), "Vec3f must match NativePoint");
+	std::vector<openvdb::Vec3f> vertices(static_cast<size_t>(vCount));
+	std::memcpy(vertices.data(), vPoints, static_cast<size_t>(vCount) * sizeof(NativePoint));
 
-	std::vector<openvdb::Vec3d> vertices(vCount);
-	std::memcpy(vertices.data(), vPoints, vCount * sizeof(NativePoint));
-
-	std::vector<openvdb::Vec3I> triangles;
-	triangles.reserve(fCount);
+	// faces
+	size_t triCount = 0, quadCount = 0;
 	for (int i = 0; i < fCount; ++i)
 	{
 		const auto &f = vFaces[i];
-		triangles.emplace_back(f.a, f.b, f.c);
+		(f.d == f.c) ? ++triCount : ++quadCount;
+	}
+	std::vector<openvdb::Vec3I> triangles(triCount);
+	std::vector<openvdb::Vec4I> quads(quadCount);
+
+	size_t ti = 0, qi = 0;
+	for (int i = 0; i < fCount; ++i)
+	{
+		const auto &f = vFaces[i];
+		if (f.d == f.c)
+			triangles[ti++] = openvdb::Vec3I(f.a, f.b, f.c);
+		else
+			quads[qi++] = openvdb::Vec4I(f.a, f.b, f.c, f.d);
 	}
 
-	std::vector<openvdb::Vec4I> quads;
+	return grid->FromMesh(vertices, triangles, quads, voxelSize, bandwidth);
+}
 
-	return grid->CreateFromMesh(vertices, triangles, quads, voxelSize, bandwidth);
+// helper to pack tris+quads into NativeFace with d==c convention
+static void packFaces(const std::vector<openvdb::Vec3I> &tris, const std::vector<openvdb::Vec4I> &quads, NativeFace *outFaces)
+{
+	size_t k = 0;
+
+	for (const auto &t : tris)
+	{
+		outFaces[k++] = NativeFace{static_cast<int>(t.x()), static_cast<int>(t.y()), static_cast<int>(t.z()), static_cast<int>(t.z())};
+	}
+
+	for (const auto &q : quads)
+	{
+		outFaces[k++] = NativeFace{static_cast<int>(q.x()), static_cast<int>(q.y()), static_cast<int>(q.z()), static_cast<int>(q.w())};
+	}
 }
 
 DENDRO_API bool DendroToMesh(DendroGrid *grid, NativePoint **vPoints, int *vCount, NativeFace **vFaces, int *fCount, double isovalue, double adaptivity)
@@ -124,58 +150,41 @@ DENDRO_API bool DendroToMesh(DendroGrid *grid, NativePoint **vPoints, int *vCoun
 	if (!grid || !vPoints || !vCount || !vFaces || !fCount)
 		return false;
 
-	std::vector<openvdb::Vec3d> vertices;
-	std::vector<openvdb::Vec3I> triangles;
+	// internal mesh data
+	std::vector<openvdb::Vec3f> verts;
+	std::vector<openvdb::Vec3I> tris;
 	std::vector<openvdb::Vec4I> quads;
 
-	grid->ToMesh(vertices, triangles, quads, isovalue, adaptivity);
+	grid->ToMesh(verts, tris, quads, isovalue, adaptivity);
 
-	size_t vertCount = vertices.size();
-	size_t triCount = triangles.size() + quads.size() * 2;
+	// allocate output buffers
+	const size_t vN = verts.size();
+	const size_t fN = tris.size() + quads.size();
 
-	NativePoint *pVerts = reinterpret_cast<NativePoint *>(malloc(vertCount * sizeof(NativePoint)));
-	NativeFace *pFaces = reinterpret_cast<NativeFace *>(malloc(triCount * sizeof(NativeFace)));
+	if (vN == 0 || fN == 0)
+		return false;
 
-	if (!pVerts || !pFaces)
+	auto *vBuf = static_cast<NativePoint *>(std::malloc(vN * sizeof(NativePoint)));
+	auto *fBuf = static_cast<NativeFace *>(std::malloc(fN * sizeof(NativeFace)));
+	if (!vBuf || !fBuf)
 	{
-		free(pVerts);
-		free(pFaces);
+		std::free(vBuf);
+		std::free(fBuf);
 		return false;
 	}
 
-	for (size_t i = 0; i < vertices.size(); ++i)
-	{
-		const auto &v = vertices[i];
-		pVerts[i].x = v.x();
-		pVerts[i].y = v.y();
-		pVerts[i].z = v.z();
-	}
+	// vertices
+	static_assert(sizeof(openvdb::Vec3f) == sizeof(NativePoint), "Vec3f must match NativePoint layout");
+	std::memcpy(vBuf, verts.data(), vN * sizeof(NativePoint));
 
-	size_t idx = 0;
-	for (const auto &t : triangles)
-	{
-		pFaces[idx].a = t[0];
-		pFaces[idx].b = t[1];
-		pFaces[idx].c = t[2];
-		++idx;
-	}
-	for (const auto &q : quads)
-	{
-		pFaces[idx].a = q[0];
-		pFaces[idx].b = q[1];
-		pFaces[idx].c = q[2];
-		++idx;
-		pFaces[idx].a = q[0];
-		pFaces[idx].b = q[2];
-		pFaces[idx].c = q[3];
-		++idx;
-	}
+	// faces
+	packFaces(tris, quads, fBuf);
 
-	*vPoints = pVerts;
-	*vFaces = pFaces;
-	*vCount = static_cast<int>(vertCount);
-	*fCount = static_cast<int>(triCount);
-
+	// publish to caller
+	*vPoints = vBuf;
+	*vCount = static_cast<int>(vN);
+	*vFaces = fBuf;
+	*fCount = static_cast<int>(fN);
 	return true;
 }
 

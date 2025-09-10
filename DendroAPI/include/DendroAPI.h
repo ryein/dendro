@@ -10,13 +10,15 @@ extern "C"
 
 	struct NativePoint
 	{
-		double x, y, z;
+		float x, y, z;
 	};
-
 	struct NativeFace
 	{
-		int a, b, c;
+		int a, b, c, d;
 	};
+
+	static_assert(sizeof(NativePoint) == 12, "NativePoint must be 12 bytes");
+	static_assert(sizeof(NativeFace) == 16, "NativeFace must be 16 bytes");
 
 	// ovdb volume class constructors
 	extern DENDRO_API DendroGrid *DendroCreate();
