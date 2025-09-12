@@ -50,7 +50,6 @@ namespace DendroGH.Components
             if (!DA.GetDataList(1, vPoints)) return;
 
             List<Point3d> cp = volume.ClosestPoint(vPoints);
-
             DA.SetDataList(0, cp);
         }
 

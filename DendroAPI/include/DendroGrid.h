@@ -3,12 +3,12 @@
 #ifndef __DENDROGRID_H__
 #define __DENDROGRID_H__
 
-#include "DendroParticle.h"
-#include "DendroMesh.h"
+#include "NativeTypes.h"
 
 #define IMATH_HALF_NO_LOOKUP_TABLE
 
 #include <openvdb/openvdb.h>
+#include <openvdb/version.h>
 #include <vector>
 #include <string>
 
@@ -24,9 +24,9 @@ public:
 	bool Read(const char *vFile);
 	bool Write(const char *vFile);
 
-	bool CreateFromPoints(DendroParticle vPoints, double voxelSize, double bandwidth);
-	bool FromMesh(const std::vector<openvdb::Vec3s> &vertices, const std::vector<openvdb::Vec3I> &triangles, const std::vector<openvdb::Vec4I> &quads, double voxelSize, double bandwidth);
 	void ToMesh(std::vector<openvdb::Vec3s> &vertices, std::vector<openvdb::Vec3I> &triangles, std::vector<openvdb::Vec4I> &quads, double isovalue, double adaptivity);
+	bool FromPoints(NativeParticle plist, double voxelSize, double bandwidth);
+	bool FromMesh(const std::vector<openvdb::Vec3s> &vertices, const std::vector<openvdb::Vec3I> &triangles, const std::vector<openvdb::Vec4I> &quads, double voxelSize, double bandwidth);
 
 	void Transform(openvdb::math::Mat4d xform);
 

@@ -5,6 +5,7 @@
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/LevelSetFilter.h>
 #include <openvdb/tools/LevelSetMorph.h>
+#include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
 #include <openvdb/Types.h>
@@ -63,41 +64,54 @@ bool DendroGrid::Write(const char *vFile)
 	return true;
 }
 
-bool DendroGrid::FromMesh(const std::vector<openvdb::Vec3s> &vertices, const std::vector<openvdb::Vec3I> &triangles, const std::vector<openvdb::Vec4I> &quads, double voxelSize, double bandwidth)
-{
-	openvdb::math::Transform xform;
-	xform.preScale(voxelSize);
-
-	const float halfWidthVox = static_cast<float>(bandwidth / voxelSize);
-
-	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(xform, vertices, triangles, quads, halfWidthVox);
-
-	return true;
-}
-
-bool DendroGrid::CreateFromPoints(DendroParticle vPoints, double voxelSize, double bandwidth)
-{
-	if (!vPoints.IsValid())
-	{
-		return false;
-	}
-
-	mGrid = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, float(bandwidth / voxelSize));
-	openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid> raster(*mGrid);
-
-	openvdb::math::Transform::Ptr xform = openvdb::math::Transform::createLinearTransform(voxelSize);
-	mGrid->setTransform(xform);
-
-	raster.setGrainSize(1);
-	raster.rasterizeSpheres(vPoints);
-	raster.finalize();
-
-	return true;
-}
-
 void DendroGrid::ToMesh(std::vector<openvdb::Vec3s> &vertices, std::vector<openvdb::Vec3I> &triangles, std::vector<openvdb::Vec4I> &quads, double isovalue, double adaptivity)
 {
+	// converts isovalue from world units to voxel space
+	isovalue /= mGrid->voxelSize().x();
+
+	// extracts a polygonal mesh from the level set grid
 	openvdb::tools::volumeToMesh<openvdb::FloatGrid>(*mGrid, vertices, triangles, quads, isovalue, adaptivity);
+}
+
+bool DendroGrid::FromMesh(const std::vector<openvdb::Vec3s> &vertices, const std::vector<openvdb::Vec3I> &triangles, const std::vector<openvdb::Vec4I> &quads, double voxelSize, double bandwidth)
+{
+	// create linear transform that maps voxel indices to world space.
+	openvdb::math::Transform::Ptr xform = openvdb::math::Transform::createLinearTransform(voxelSize);
+
+	// converts bandwidth from world units to voxel space
+	const float voxBandwidth = static_cast<float>(bandwidth / voxelSize);
+
+	// create SDF levelset
+	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(*xform, vertices, triangles, quads, voxBandwidth);
+
+	return true;
+}
+
+bool DendroGrid::FromPoints(NativeParticle plist, double voxelSize, double bandwidth)
+{
+	using GridT = openvdb::FloatGrid;
+
+	// converts bandwidth from world units to voxel space
+	const float voxBandwidth = static_cast<float>(bandwidth / voxelSize);
+
+	// Background encodes half-width in world units
+	GridT::Ptr sdf = GridT::create(voxBandwidth);
+	sdf->setTransform(openvdb::math::Transform::createLinearTransform(voxelSize));
+	sdf->setGridClass(openvdb::GRID_LEVEL_SET);
+	sdf->setName("sdf");
+
+	// v12 ctor: just the grid (optionally an interrupter)
+	openvdb::tools::ParticlesToLevelSet<GridT> raster(*sdf);
+
+	// Optional clamps in *voxel units* if you want them:
+	// raster.setRmin(minRadiusWorld / voxelSize);
+	// raster.setRmax(maxRadiusWorld / voxelSize);
+
+	raster.rasterizeSpheres(plist); // per-particle radius is in world units
+	raster.finalize();
+
+	mGrid = std::move(sdf);
+	return true;
 }
 
 void DendroGrid::Transform(openvdb::math::Mat4d xform)

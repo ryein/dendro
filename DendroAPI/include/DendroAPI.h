@@ -2,23 +2,12 @@
 
 #include "export.h"
 #include "DendroGrid.h"
+#include "NativeTypes.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
-
-	struct NativePoint
-	{
-		float x, y, z;
-	};
-	struct NativeFace
-	{
-		int a, b, c, d;
-	};
-
-	static_assert(sizeof(NativePoint) == 12, "NativePoint must be 12 bytes");
-	static_assert(sizeof(NativeFace) == 16, "NativeFace must be 16 bytes");
 
 	// ovdb volume class constructors
 	extern DENDRO_API DendroGrid *DendroCreate();
@@ -29,7 +18,7 @@ extern "C"
 	extern DENDRO_API bool DendroWrite(DendroGrid *grid, const char *filename);
 
 	// volume conversion methods
-	extern DENDRO_API bool DendroFromPoints(DendroGrid *grid, const NativePoint *vPoints, size_t pCount, const double *vRadius, int rCount, double voxelSize, double bandwidth);
+	extern DENDRO_API bool DendroFromPoints(DendroGrid *grid, const NativePoint *vPoints, size_t pCount, const float *vRadius, size_t rCount, double voxelSize, double bandwidth);
 	extern DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int vCount, const NativeFace *vFaces, int fCount, double voxelSize, double bandwidth);
 	extern DENDRO_API bool DendroToMesh(DendroGrid *grid, NativePoint **vPoints, int *vCount, NativeFace **vFaces, int *fCount, double isovalue, double adaptivity);
 	extern DENDRO_API void DendroFree(void *ptr);

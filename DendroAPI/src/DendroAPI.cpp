@@ -1,8 +1,6 @@
 // DendroAPI.cpp : Defines the exported functions for the DLL application.
 #include "DendroAPI.h"
 
-#include "DendroParticle.h"
-#include "DendroMesh.h"
 #include <openvdb/util/Util.h>
 #include <vector>
 #include <cstdlib>
@@ -41,61 +39,10 @@ DENDRO_API bool DendroWrite(DendroGrid *grid, const char *filename)
 }
 
 // grid conversion methods
-DENDRO_API bool DendroFromPoints(DendroGrid *grid, const NativePoint *vPoints, size_t pCount, const double *vRadius, int rCount, double voxelSize, double bandwidth)
+DENDRO_API bool DendroFromPoints(DendroGrid *grid, const NativePoint *vPoints, size_t pCount, const float *vRadius, size_t rCount, double voxelSize, double bandwidth)
 {
-	std::vector<openvdb::Vec3R> particleList;
-	particleList.reserve(pCount);
-
-	if constexpr (std::is_same_v<openvdb::Real, double>)
-	{
-		// Real == double → layouts match (3 doubles) → memcpy
-		particleList.resize(pCount);
-		std::memcpy(particleList.data(), vPoints, pCount * sizeof(NativePoint));
-	}
-	else
-	{
-		// Real == float → single pass cast
-		for (size_t i = 0; i < pCount; ++i)
-		{
-			const auto &q = vPoints[i];
-			particleList.emplace_back(
-				openvdb::Real(q.x),
-				openvdb::Real(q.y),
-				openvdb::Real(q.z));
-		}
-	}
-
-	DendroParticle ps;
-	ps.clear();
-
-	if (particleList.size() == rCount)
-	{
-
-		int i = 0;
-		for (auto it = particleList.begin(); it != particleList.end(); ++it)
-		{
-			ps.add((*it), openvdb::Real(vRadius[i]));
-			i++;
-		}
-	}
-	else
-	{
-
-		double average = 0.0;
-		for (int i = 0; i < rCount; i++)
-		{
-			average += vRadius[i];
-		}
-		average /= rCount;
-		openvdb::Real radius = openvdb::Real(average);
-
-		for (auto it = particleList.begin(); it != particleList.end(); ++it)
-		{
-			ps.add((*it), radius);
-		}
-	}
-
-	return grid->CreateFromPoints(ps, voxelSize, bandwidth);
+	NativeParticle plist(vPoints, pCount, vRadius, rCount);
+	return grid->FromPoints(plist, voxelSize, bandwidth);
 }
 
 DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int vCount, const NativeFace *vFaces, int fCount, double voxelSize, double bandwidth)

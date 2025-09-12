@@ -71,8 +71,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
-        static private extern bool DendroFromPoints(IntPtr grid, IntPtr pts, nuint count, [In] double[] radii, int rCount, double voxelSize, double bandwidth);
-
+        private static extern unsafe bool DendroFromPoints(IntPtr grid, NativePoint* vPoints, nuint pCount, float* vRadius, nuint rCount, double voxelSize, double bandwidth);
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
 #else
@@ -244,7 +243,7 @@ namespace DendroGH
             // pinvoke grid creation
             this.Grid = DendroCreate();
 
-            this.IsValid = this.CreateFromPoints(vPoints, vRadius, vSettings);
+            this.IsValid = this.ToVolume(vPoints, vRadius, vSettings);
         }
 
         /// <summary>
@@ -403,7 +402,7 @@ namespace DendroGH
             if (vMesh == null || !vMesh.IsValid) return false;
 
             double voxelSize = Math.Max(0.01, vSettings.VoxelSize);
-            double bandwidth = Math.Max(1.0, vSettings.Bandwidth);
+            double bandwidth = Math.Max(0.01, vSettings.Bandwidth);
 
             // clean up mesh
             vMesh.Faces.CullDegenerateFaces();
@@ -440,6 +439,49 @@ namespace DendroGH
             return ok;
         }
 
+        /// <summary>
+        /// build a volume from a supplied list of points
+        /// </summary>
+        /// <remark>must supply a single radius value or a list of radii equal to the number of points supplied</remark>
+        /// <param name="vPoints">point set to build volume from</param>
+        /// <param name="vRadius">radius values for each point</param>
+        /// <param name="vSettings">voxelization settings to be used</param>
+        /// <returns>boolean value for whether volume was built successfully</returns>
+        public bool ToVolume(List<Point3d> vPoints, List<double> vRadius, DendroSettings vSettings)
+        {
+            if (vPoints is null || vRadius is null) return false;
+
+            int pCount = vPoints.Count;
+            if (pCount == 0) return false;
+
+            // allow one uniform radius or per point radius
+            int rCount = vRadius.Count;
+            if (rCount != 1 && rCount != pCount) return false;
+
+            double voxelSize = Math.Max(vSettings.VoxelSize, 0.01);
+            double bandwidth = Math.Max(vSettings.Bandwidth, 0.01);
+
+            // allocate once and fill
+            var pArr = new NativePoint[pCount];
+            for (int i = 0; i < pCount; i++)
+            {
+                var p = vPoints[i];
+                pArr[i] = new NativePoint { X = (float)p.X, Y = (float)p.Y, Z = (float)p.Z };
+            }
+
+            // radii: double -> float
+            var rArr = new float[rCount];
+            for (int i = 0; i < rCount; i++) rArr[i] = (float)vRadius[i];
+
+            unsafe
+            {
+                fixed (NativePoint* pPtr = pArr)
+                fixed (float* rPtr = rArr)
+                {
+                    return DendroFromPoints(this.Grid, pPtr, (nuint)pCount, rPtr, (nuint)rCount, voxelSize, bandwidth);
+                }
+            }
+        }
 
         /// <summary>
         /// generate a mesh from the current volume
@@ -493,56 +535,6 @@ namespace DendroGH
             }
         }
 
-        /// <summary>
-        /// build a volume from a supplied list of points
-        /// </summary>
-        /// <remark>must supply a single radius value or a list of radii equal to the number of points supplied</remark>
-        /// <param name="vPoints">point set to build volume from</param>
-        /// <param name="vRadius">radius values for each point</param>
-        /// <param name="vSettings">voxelization settings to be used</param>
-        /// <returns>boolean value for whether volume was built successfully</returns>
-        public bool CreateFromPoints(List<Point3d> vPoints, List<double> vRadius, DendroSettings vSettings)
-        {
-            // there were no points/radius supplied so exit
-            if (vPoints.Count == 0 || vRadius.Count == 0) return false;
-
-            // check for invalid voxelsize settings
-            if (vSettings.VoxelSize < 0.01) vSettings.VoxelSize = 0.01;
-
-            // check for invalid bandwidth settings
-            if (vSettings.Bandwidth < 1) vSettings.Bandwidth = 1;
-
-            // if one or equal radius values were supplied then build volume
-            if (vPoints.Count == vRadius.Count || vRadius.Count == 1)
-            {
-
-                // create radius array from list so we can pass to c++
-                double[] radius = vRadius.ToArray();
-
-                // Get a span view over the list’s backing array
-                var span = CollectionsMarshal.AsSpan(vPoints);
-
-                // Reinterpret as our DendroPoint layout (three doubles)
-                var dspan = MemoryMarshal.Cast<Point3d, NativePoint>(span);
-
-                unsafe
-                {
-                    fixed (NativePoint* p = dspan)
-                    {
-
-
-                        this.IsValid = DendroFromPoints(this.Grid, (IntPtr)p, (nuint)dspan.Length, radius, radius.Length, vSettings.VoxelSize, vSettings.Bandwidth);
-
-                        if (!this.IsValid) return false;
-
-                        return true;
-                    }
-                }
-
-            }
-
-            return false;
-        }
 
         /// <summary>
         /// build a volume from a supplied list of curves
@@ -566,35 +558,36 @@ namespace DendroGH
             if (vSettings.Bandwidth < 1)
                 vSettings.Bandwidth = 1;
 
-            // find out if we were supplied a single radius value or multiple values
-            int method = GetCurveSolverMethod(vCurves.Count, vRadius.Count);
+            // // find out if we were supplied a single radius value or multiple values
+            // int method = GetCurveSolverMethod(vCurves.Count, vRadius.Count);
 
-            bool validInput = false;
-            List<double> rValues = new List<double>();
-            List<Point3d> vPoints = new List<Point3d>();
+            // bool validInput = false;
+            // List<float> rValues = new List<float>();
+            // List<Point3d> vPoints = new List<Point3d>();
 
-            switch (method)
-            {
-                // only a single radius was supplied
-                case 1:
-                    validInput = ResolveSingleRadius(vCurves, vRadius[0], out vPoints, out rValues);
-                    break;
+            // switch (method)
+            // {
+            //     // only a single radius was supplied
+            //     case 1:
+            //         validInput = ResolveSingleRadius(vCurves, vRadius[0], out vPoints, out rValues);
+            //         break;
 
-                // multiple radius values were supplied
-                case 2:
-                    validInput = ResolveMultipleRadius(vCurves, vRadius, out vPoints, out rValues);
-                    break;
-                default:
-                    validInput = false;
-                    break;
-            }
+            //     // multiple radius values were supplied
+            //     case 2:
+            //         validInput = ResolveMultipleRadius(vCurves, vRadius, out vPoints, out rValues);
+            //         break;
+            //     default:
+            //         validInput = false;
+            //         break;
+            // }
 
-            // supplied values were not valid so exit
-            if (!validInput)
-                return false;
+            // // supplied values were not valid so exit
+            // if (!validInput)
+            //     return false;
 
-            // return results from point to volume function
-            return this.CreateFromPoints(vPoints, rValues, vSettings);
+            // // return results from point to volume function
+            // return this.ToVolume(vPoints, rValues, vSettings);
+            return true;
         }
 
         /// <summary>
