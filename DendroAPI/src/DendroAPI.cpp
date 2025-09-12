@@ -1,10 +1,10 @@
 // DendroAPI.cpp : Defines the exported functions for the DLL application.
 #include "DendroAPI.h"
 
-#include "DendroParticle.h"
-#include "DendroMesh.h"
 #include <openvdb/util/Util.h>
 #include <vector>
+#include <cstdlib>
+#include <cstring>
 
 // grid class constructors
 DENDRO_API DendroGrid *DendroCreate()
@@ -39,89 +39,108 @@ DENDRO_API bool DendroWrite(DendroGrid *grid, const char *filename)
 }
 
 // grid conversion methods
-DENDRO_API bool DendroFromPoints(DendroGrid *grid, const DendroPoint *vPoints, size_t pCount, const double *vRadius, int rCount, double voxelSize, double bandwidth)
+DENDRO_API bool DendroFromPoints(DendroGrid *grid, const NativePoint *vPoints, size_t pCount, const float *vRadius, size_t rCount, double voxelSize, double bandwidth)
 {
-	std::vector<openvdb::Vec3R> particleList;
-	particleList.reserve(pCount);
-
-	if constexpr (std::is_same_v<openvdb::Real, double>)
-	{
-		// Real == double → layouts match (3 doubles) → memcpy
-		particleList.resize(pCount);
-		std::memcpy(particleList.data(), vPoints, pCount * sizeof(DendroPoint));
-	}
-	else
-	{
-		// Real == float → single pass cast
-		for (size_t i = 0; i < pCount; ++i)
-		{
-			const auto &q = vPoints[i];
-			particleList.emplace_back(
-				openvdb::Real(q.x),
-				openvdb::Real(q.y),
-				openvdb::Real(q.z));
-		}
-	}
-
-	DendroParticle ps;
-	ps.clear();
-
-	if (particleList.size() == rCount)
-	{
-
-		int i = 0;
-		for (auto it = particleList.begin(); it != particleList.end(); ++it)
-		{
-			ps.add((*it), openvdb::Real(vRadius[i]));
-			i++;
-		}
-	}
-	else
-	{
-
-		double average = 0.0;
-		for (int i = 0; i < rCount; i++)
-		{
-			average += vRadius[i];
-		}
-		average /= rCount;
-		openvdb::Real radius = openvdb::Real(average);
-
-		for (auto it = particleList.begin(); it != particleList.end(); ++it)
-		{
-			ps.add((*it), radius);
-		}
-	}
-
-	return grid->CreateFromPoints(ps, voxelSize, bandwidth);
+	NativeParticle plist(vPoints, pCount, vRadius, rCount);
+	return grid->FromPoints(plist, voxelSize, bandwidth);
 }
 
-DENDRO_API bool DendroFromMesh(DendroGrid *grid, float *vPoints, int vCount, int *vFaces, int fCount, double voxelSize, double bandwidth)
+DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int vCount, const NativeFace *vFaces, int fCount, double voxelSize, double bandwidth)
 {
-	DendroMesh vMesh;
-	vMesh.Clear();
+	// vertices
+	static_assert(std::is_trivially_copyable<openvdb::Vec3f>::value, "Vec3f must be trivially copyable");
+	static_assert(sizeof(openvdb::Vec3f) == sizeof(NativePoint), "Vec3f must match NativePoint");
+	std::vector<openvdb::Vec3f> vertices(static_cast<size_t>(vCount));
+	std::memcpy(vertices.data(), vPoints, static_cast<size_t>(vCount) * sizeof(NativePoint));
 
-	int i = 0;
-	while (i < vCount)
+	// faces
+	size_t triCount = 0, quadCount = 0;
+	for (int i = 0; i < fCount; ++i)
 	{
+		const auto &f = vFaces[i];
+		(f.d == f.c) ? ++triCount : ++quadCount;
+	}
+	std::vector<openvdb::Vec3I> triangles(triCount);
+	std::vector<openvdb::Vec4I> quads(quadCount);
 
-		openvdb::Vec3s vertex(vPoints[i], vPoints[i + 1], vPoints[i + 2]);
-
-		vMesh.AddVertice(vertex);
-
-		i += 3;
+	size_t ti = 0, qi = 0;
+	for (int i = 0; i < fCount; ++i)
+	{
+		const auto &f = vFaces[i];
+		if (f.d == f.c)
+			triangles[ti++] = openvdb::Vec3I(f.a, f.b, f.c);
+		else
+			quads[qi++] = openvdb::Vec4I(f.a, f.b, f.c, f.d);
 	}
 
-	i = 0;
-	while (i < fCount)
-	{
-		openvdb::Vec4I face(vFaces[i], vFaces[i + 1], vFaces[i + 2], openvdb::util::INVALID_IDX);
+	return grid->FromMesh(vertices, triangles, quads, voxelSize, bandwidth);
+}
 
-		vMesh.AddFace(face);
-		i += 3;
+// helper to pack tris+quads into NativeFace with d==c convention
+static void packFaces(const std::vector<openvdb::Vec3I> &tris, const std::vector<openvdb::Vec4I> &quads, NativeFace *outFaces)
+{
+	size_t k = 0;
+
+	for (const auto &t : tris)
+	{
+		outFaces[k++] = NativeFace{static_cast<int>(t.x()), static_cast<int>(t.y()), static_cast<int>(t.z()), static_cast<int>(t.z())};
 	}
 
-	return grid->CreateFromMesh(vMesh, voxelSize, bandwidth);
+	for (const auto &q : quads)
+	{
+		outFaces[k++] = NativeFace{static_cast<int>(q.x()), static_cast<int>(q.y()), static_cast<int>(q.z()), static_cast<int>(q.w())};
+	}
+}
+
+DENDRO_API bool DendroToMesh(DendroGrid *grid, NativePoint **vPoints, int *vCount, NativeFace **vFaces, int *fCount, double isovalue, double adaptivity)
+{
+	if (!grid || !vPoints || !vCount || !vFaces || !fCount)
+		return false;
+
+	// internal mesh data
+	std::vector<openvdb::Vec3f> verts;
+	std::vector<openvdb::Vec3I> tris;
+	std::vector<openvdb::Vec4I> quads;
+
+	grid->ToMesh(verts, tris, quads, isovalue, adaptivity);
+
+	// allocate output buffers
+	const size_t vN = verts.size();
+	const size_t fN = tris.size() + quads.size();
+
+	if (vN == 0 || fN == 0)
+		return false;
+
+	auto *vBuf = static_cast<NativePoint *>(std::malloc(vN * sizeof(NativePoint)));
+	auto *fBuf = static_cast<NativeFace *>(std::malloc(fN * sizeof(NativeFace)));
+	if (!vBuf || !fBuf)
+	{
+		std::free(vBuf);
+		std::free(fBuf);
+		return false;
+	}
+
+	// vertices
+	static_assert(sizeof(openvdb::Vec3f) == sizeof(NativePoint), "Vec3f must match NativePoint layout");
+	std::memcpy(vBuf, verts.data(), vN * sizeof(NativePoint));
+
+	// faces
+	packFaces(tris, quads, fBuf);
+
+	// publish to caller
+	*vPoints = vBuf;
+	*vCount = static_cast<int>(vN);
+	*vFaces = fBuf;
+	*fCount = static_cast<int>(fN);
+	return true;
+}
+
+DENDRO_API void DendroFree(void *ptr)
+{
+	if (ptr != nullptr)
+	{
+		free(ptr);
+	}
 }
 
 // grid transformation methods
