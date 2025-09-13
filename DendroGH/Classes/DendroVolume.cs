@@ -21,6 +21,12 @@ namespace DendroGH
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         struct NativePoint { public float X, Y, Z; }
 
+        [StructLayout(LayoutKind.Sequential, Pack = 8)]
+        struct NativePointD { public double X, Y, Z; }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        struct NativeSegment { public int A, B; }
+
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         struct NativeFace { public int A, B, C, D; }
 
@@ -78,7 +84,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
-        private static extern unsafe bool DendroFromCurves(IntPtr grid);
+        private static extern unsafe bool DendroFromCurves(IntPtr grid, NativePointD* pts, nuint pCount, NativeSegment* segs, nuint sCount, double radius, double voxelSize, double bandwidth);
 
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
@@ -266,7 +272,7 @@ namespace DendroGH
             // pinvoke grid creation
             this.Grid = DendroCreate();
 
-            this.IsValid = this.CreateFromCurves(vCurves, vRadius, vSettings);
+            this.IsValid = this.ToVolume(vCurves, vRadius, vSettings);
         }
 
         /// <summary>
@@ -492,6 +498,72 @@ namespace DendroGH
         }
 
         /// <summary>
+        /// build a volume from a supplied list of curves
+        /// </summary>
+        /// <remark>must supply a single radius value or a list of radii equal to the number of curves supplied</remark>
+        /// <param name="vCurves">curves to build volume from</param>
+        /// <param name="vRadius">radius values for each curve</param>
+        /// <param name="vSettings">voxelization settings to be used</param>
+        /// <returns>boolean value for whether volume was built successfully</returns>
+        public bool ToVolume(List<Curve> vCurves, double vRadius, DendroSettings vSettings)
+        {
+            double AngleTol = 0.1;     // radians
+            double DistTol = 0.01;     // model units
+            double MinSegLen = 0.0;    // minimum segment length
+            double MaxSegLen = double.MaxValue; // maximum segment length
+
+            List<NativePointD> points = new List<NativePointD>();
+            List<NativeSegment> segments = new List<NativeSegment>();
+            foreach (Curve c in vCurves)
+            {
+                if (c != null || c.IsValid)
+                {
+                    Polyline poly;
+                    if (!c.TryGetPolyline(out poly))
+                    {
+                        var plc = c.ToPolyline(DistTol, AngleTol, MinSegLen, MaxSegLen);
+                        if (plc != null) continue;
+                        if (!plc.TryGetPolyline(out poly)) continue;
+                    }
+
+                    if (poly == null || poly.Count < 2) continue;
+
+                    int start = points.Count;
+                    for (int i = 0; i < poly.Count; i++)
+                    {
+                        var pt = poly[i];
+                        points.Add(new NativePointD { X = pt.X, Y = pt.Y, Z = pt.Z });
+                    }
+                    for (int i = 0; i < poly.Count - 1; i++)
+                    {
+                        segments.Add(new NativeSegment { A = start + i, B = start + i + 1 });
+                    }
+                    if (poly.IsClosed)
+                        segments.Add(new NativeSegment { A = start + poly.Count - 1, B = start });
+                }
+            }
+
+            if (points.Count == 0 || segments.Count == 0)
+            {
+                return false;
+            }
+
+            NativePointD[] pArray = points.ToArray();
+            NativeSegment[] sArray = segments.ToArray();
+            bool ok = false;
+            unsafe
+            {
+                fixed (NativePointD* pPtr = pArray)
+                fixed (NativeSegment* sPtr = sArray)
+                {
+                    ok = DendroFromCurves(this.Grid, pPtr, (nuint)pArray.Length, sPtr, (nuint)sArray.Length, vRadius, vSettings.VoxelSize, vSettings.Bandwidth);
+                }
+            }
+
+            return ok;
+        }
+
+        /// <summary>
         /// generate a mesh from the current volume
         /// </summary>
         /// <returns>mesh representation or null if conversion failed</returns>
@@ -541,25 +613,6 @@ namespace DendroGH
                 DendroFree(vPtr);
                 DendroFree(fPtr);
             }
-        }
-
-
-        /// <summary>
-        /// build a volume from a supplied list of curves
-        /// </summary>
-        /// <remark>must supply a single radius value or a list of radii equal to the number of curves supplied</remark>
-        /// <param name="vCurves">curves to build volume from</param>
-        /// <param name="vRadius">radius values for each curve</param>
-        /// <param name="vSettings">voxelization settings to be used</param>
-        /// <returns>boolean value for whether volume was built successfully</returns>
-        public bool CreateFromCurves(List<Curve> vCurves, double vRadius, DendroSettings vSettings)
-        {
-            // convert the curves to be all polylines, input can be lines, nurbs curve, polycurves,etc so i'll need to convert accordingly
-            //package polylines for c++
-            // send to c++
-
-            bool ok = DendroFromCurves(this.Grid);
-            return true;
         }
 
         /// <summary>

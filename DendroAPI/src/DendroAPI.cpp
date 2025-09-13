@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdlib>
 #include <cstring>
+#include <type_traits>
 
 // grid class constructors
 DENDRO_API DendroGrid *DendroCreate()
@@ -76,7 +77,46 @@ DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int
 	return grid->FromMesh(vertices, triangles, quads, voxelSize, bandwidth);
 }
 
-// helper to pack tris+quads into NativeFace with d==c convention
+DENDRO_API bool DendroFromCurves(DendroGrid *grid, const NativePointD *pts, size_t pCount, const NativeSegment *segs, size_t sCount, double radius, double voxelSize, double bandwidth)
+{
+	// // vertices
+	// static_assert(std::is_trivially_copyable<openvdb::Vec3s>::value,
+	// 			  "Vec3s must be trivially copyable");
+	// static_assert(sizeof(openvdb::Vec3s) == sizeof(NativePoint),
+	// 			  "Vec3s must match NativePoint");
+	// std::vector<openvdb::Vec3s> pts(static_cast<size_t>(pCount));
+	// std::memcpy(pts.data(), vPoints, static_cast<size_t>(pCount) * sizeof(NativePoint));
+
+	// // segments -> Vec2I
+	// std::vector<openvdb::Vec2I> segs;
+	// segs.reserve(static_cast<size_t>(sCount));
+	// for (int i = 0; i < sCount; ++i)
+	// {
+	// 	const auto &s = vSegments[i];
+	// 	segs.emplace_back(s.a, s.b);
+	// }
+	std::vector<openvdb::math::Vec3s> P;
+	P.reserve(pCount);
+	for (size_t i = 0; i < pCount; ++i)
+	{
+		P.emplace_back(
+			static_cast<float>(pts[i].x),
+			static_cast<float>(pts[i].y),
+			static_cast<float>(pts[i].z));
+	}
+
+	std::vector<openvdb::Vec2I> S;
+	S.reserve(sCount);
+	for (size_t i = 0; i < sCount; ++i)
+	{
+		S.emplace_back(segs[i].a, segs[i].b);
+	}
+
+	return grid->FromCurves(P, S, radius, voxelSize, bandwidth);
+	// return grid->FromCurves(pts, segs, radius, voxelSize, bandwidth);
+}
+
+// helper
 static void packFaces(const std::vector<openvdb::Vec3I> &tris, const std::vector<openvdb::Vec4I> &quads, NativeFace *outFaces)
 {
 	size_t k = 0;

@@ -8,6 +8,7 @@
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
+#include <openvdb/tools/LevelSetTubes.h>
 #include <openvdb/Types.h>
 #include <openvdb/tools/VolumeToSpheres.h>
 #include <vector>
@@ -111,6 +112,17 @@ bool DendroGrid::FromPoints(NativeParticle plist, double voxelSize, double bandw
 	raster.finalize();
 
 	mGrid = std::move(sdf);
+	return true;
+}
+
+bool DendroGrid::FromCurves(const std::vector<openvdb::Vec3s> &points, const std::vector<openvdb::Vec2I> &segments, double radius, double voxelSize, double bandwidth)
+{
+	// converts bandwidth from world units to voxel space
+	const float voxBandwidth = static_cast<float>(bandwidth / voxelSize);
+
+	// create the level set tube complex
+	mGrid = openvdb::tools::createLevelSetTubeComplex<openvdb::FloatGrid>(points, segments, static_cast<float>(radius), static_cast<float>(voxelSize), voxBandwidth);
+
 	return true;
 }
 

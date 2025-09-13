@@ -8,6 +8,6 @@
 
   "registries": [],
 
-  "overlay-ports": [],
+  "overlay-ports": ["../vcpkg/overlays/ports"],
   "overlay-triplets": []
 }

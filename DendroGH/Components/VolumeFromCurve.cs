@@ -42,16 +42,16 @@ namespace DendroGH
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             List<Curve> vCurves = new List<Curve>();
-            double vRadius = null;
+            double vRadius = 0.0;
             DendroSettings vSettings = new DendroSettings();
 
             if (!DA.GetDataList(0, vCurves)) return;
-            if (!DA.GetData(1, vRadius)) return;
+            if (!DA.GetData(1, ref vRadius)) return;
             if (!DA.GetData(2, ref vSettings)) return;
 
             double minRadius = vSettings.VoxelSize / 0.6667;
 
-            if (radius <= minRadius)
+            if (vRadius <= minRadius)
             {
                 AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Radius must be at least 33% larger than voxel size. This will compute but no volume will be created.");
             }
