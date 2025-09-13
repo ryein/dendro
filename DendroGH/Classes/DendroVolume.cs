@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Mail;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using Rhino.Geometry;
@@ -72,6 +73,13 @@ namespace DendroGH
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
         private static extern unsafe bool DendroFromPoints(IntPtr grid, NativePoint* vPoints, nuint pCount, float* vRadius, nuint rCount, double voxelSize, double bandwidth);
+#if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+#else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+#endif
+        private static extern unsafe bool DendroFromCurves(IntPtr grid);
+
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
 #else
@@ -253,7 +261,7 @@ namespace DendroGH
         /// <param name="vCurves">curves to build volume from</param>
         /// <param name="vRadius">radius values for each curve</param>
         /// <param name="vSettings">voxelization settings to be used</param>
-        public DendroVolume(List<Curve> vCurves, List<double> vRadius, DendroSettings vSettings)
+        public DendroVolume(List<Curve> vCurves, double vRadius, DendroSettings vSettings)
         {
             // pinvoke grid creation
             this.Grid = DendroCreate();
@@ -544,49 +552,13 @@ namespace DendroGH
         /// <param name="vRadius">radius values for each curve</param>
         /// <param name="vSettings">voxelization settings to be used</param>
         /// <returns>boolean value for whether volume was built successfully</returns>
-        public bool CreateFromCurves(List<Curve> vCurves, List<double> vRadius, DendroSettings vSettings)
+        public bool CreateFromCurves(List<Curve> vCurves, double vRadius, DendroSettings vSettings)
         {
-            // there were no curves/radius supplied so exit
-            if (vCurves.Count == 0 || vRadius.Count == 0)
-                return false;
+            // convert the curves to be all polylines, input can be lines, nurbs curve, polycurves,etc so i'll need to convert accordingly
+            //package polylines for c++
+            // send to c++
 
-            // check for invalid voxelsize settings
-            if (vSettings.VoxelSize < 0.01)
-                vSettings.VoxelSize = 0.01;
-
-            // check for invalid bandwidth settings
-            if (vSettings.Bandwidth < 1)
-                vSettings.Bandwidth = 1;
-
-            // // find out if we were supplied a single radius value or multiple values
-            // int method = GetCurveSolverMethod(vCurves.Count, vRadius.Count);
-
-            // bool validInput = false;
-            // List<float> rValues = new List<float>();
-            // List<Point3d> vPoints = new List<Point3d>();
-
-            // switch (method)
-            // {
-            //     // only a single radius was supplied
-            //     case 1:
-            //         validInput = ResolveSingleRadius(vCurves, vRadius[0], out vPoints, out rValues);
-            //         break;
-
-            //     // multiple radius values were supplied
-            //     case 2:
-            //         validInput = ResolveMultipleRadius(vCurves, vRadius, out vPoints, out rValues);
-            //         break;
-            //     default:
-            //         validInput = false;
-            //         break;
-            // }
-
-            // // supplied values were not valid so exit
-            // if (!validInput)
-            //     return false;
-
-            // // return results from point to volume function
-            // return this.ToVolume(vPoints, rValues, vSettings);
+            bool ok = DendroFromCurves(this.Grid);
             return true;
         }
 

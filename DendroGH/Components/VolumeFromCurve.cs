@@ -23,7 +23,7 @@ namespace DendroGH
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
             pManager.AddCurveParameter("Curves", "C", "Curves", GH_ParamAccess.list);
-            pManager.AddNumberParameter("Curve Radius", "R", "Supply one value or a list of values equal to the number of curves supplied", GH_ParamAccess.list);
+            pManager.AddNumberParameter("Curve Radius", "R", "Desired radius of supplied curves", GH_ParamAccess.item);
             pManager.AddGenericParameter("Settings", "S", "Settings for converting different geometry types to and from volumes", GH_ParamAccess.item);
         }
 
@@ -42,21 +42,18 @@ namespace DendroGH
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             List<Curve> vCurves = new List<Curve>();
-            List<double> vRadius = new List<double>();
+            double vRadius = null;
             DendroSettings vSettings = new DendroSettings();
 
             if (!DA.GetDataList(0, vCurves)) return;
-            if (!DA.GetDataList(1, vRadius)) return;
+            if (!DA.GetData(1, vRadius)) return;
             if (!DA.GetData(2, ref vSettings)) return;
 
             double minRadius = vSettings.VoxelSize / 0.6667;
 
-            foreach (double radius in vRadius)
+            if (radius <= minRadius)
             {
-                if (radius <= minRadius)
-                {
-                    AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Radius must be at least 33% larger than voxel size. This will compute but no volume will be created.");
-                }
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Radius must be at least 33% larger than voxel size. This will compute but no volume will be created.");
             }
 
             DendroVolume volume = new DendroVolume(vCurves, vRadius, vSettings);
