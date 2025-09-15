@@ -19,13 +19,18 @@ namespace DendroGH
     {
 
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
-        struct NativePoint { public float X, Y, Z; }
-
-        [StructLayout(LayoutKind.Sequential, Pack = 8)]
-        struct NativePointD { public double X, Y, Z; }
+        struct NativePoint
+        {
+            public float X, Y, Z;
+            public NativePoint(float x, float y, float z) { X = x; Y = y; Z = z; }
+        }
 
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
-        struct NativeSegment { public int A, B; }
+        struct NativeSegment
+        {
+            public int A, B;
+            public NativeSegment(int a, int b) { A = a; B = b; }
+        }
 
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         struct NativeFace { public int A, B, C, D; }
@@ -84,7 +89,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
-        private static extern unsafe bool DendroFromCurves(IntPtr grid, NativePointD* pts, nuint pCount, NativeSegment* segs, nuint sCount, double radius, double voxelSize, double bandwidth);
+        private static extern unsafe bool DendroFromCurves(IntPtr grid, NativePoint* pts, nuint pCount, NativeSegment* segs, nuint sCount, double radius, double voxelSize, double bandwidth);
 
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
@@ -461,7 +466,7 @@ namespace DendroGH
         /// <param name="vRadius">radius values for each point</param>
         /// <param name="vSettings">voxelization settings to be used</param>
         /// <returns>boolean value for whether volume was built successfully</returns>
-        public bool ToVolume(List<Point3d> vPoints, List<double> vRadius, DendroSettings vSettings)
+        public unsafe bool ToVolume(List<Point3d> vPoints, List<double> vRadius, DendroSettings vSettings)
         {
             if (vPoints is null || vRadius is null) return false;
 
@@ -480,7 +485,7 @@ namespace DendroGH
             for (int i = 0; i < pCount; i++)
             {
                 var p = vPoints[i];
-                pArr[i] = new NativePoint { X = (float)p.X, Y = (float)p.Y, Z = (float)p.Z };
+                pArr[i] = new NativePoint((float)p.X, (float)p.Y, (float)p.Z);
             }
 
             // radii: double -> float
@@ -505,61 +510,62 @@ namespace DendroGH
         /// <param name="vRadius">radius values for each curve</param>
         /// <param name="vSettings">voxelization settings to be used</param>
         /// <returns>boolean value for whether volume was built successfully</returns>
-        public bool ToVolume(List<Curve> vCurves, double vRadius, DendroSettings vSettings)
+        public unsafe bool ToVolume(List<Curve> vCurves, double vRadius, DendroSettings vSettings)
         {
-            double AngleTol = 0.1;     // radians
-            double DistTol = 0.01;     // model units
-            double MinSegLen = 0.0;    // minimum segment length
-            double MaxSegLen = double.MaxValue; // maximum segment length
+            const double tol = 1e-9;
+            var points = new List<NativePoint>();
+            var segments = new List<NativeSegment>();
 
-            List<NativePointD> points = new List<NativePointD>();
-            List<NativeSegment> segments = new List<NativeSegment>();
-            foreach (Curve c in vCurves)
+            foreach (Curve crv in vCurves)
             {
-                if (c != null || c.IsValid)
+                if (crv == null || !crv.IsValid) continue;
+
+                // lines or anything linear
+                if (crv.IsLinear())
                 {
-                    Polyline poly;
-                    if (!c.TryGetPolyline(out poly))
+                    var a = crv.PointAtStart;
+                    var b = crv.PointAtEnd;
+                    if (a.DistanceTo(b) > tol)
                     {
-                        var plc = c.ToPolyline(DistTol, AngleTol, MinSegLen, MaxSegLen);
-                        if (plc != null) continue;
-                        if (!plc.TryGetPolyline(out poly)) continue;
+                        int start = points.Count;
+                        points.Add(new NativePoint((float)a.X, (float)a.Y, (float)a.Z));
+                        points.Add(new NativePoint((float)b.X, (float)b.Y, (float)b.Z));
+                        segments.Add(new NativeSegment(start, start + 1));
                     }
+                    continue;
+                }
 
-                    if (poly == null || poly.Count < 2) continue;
+                // polylines or similar
+                if (crv.IsPolyline())
+                {
+                    if (crv is PolylineCurve plc && plc.TryGetPolyline(out Polyline pl) || crv.TryGetPolyline(out pl))
+                    {
+                        if (pl.Count < 2) continue;
 
-                    int start = points.Count;
-                    for (int i = 0; i < poly.Count; i++)
-                    {
-                        var pt = poly[i];
-                        points.Add(new NativePointD { X = pt.X, Y = pt.Y, Z = pt.Z });
+                        int start = points.Count;
+                        for (int i = 0; i < pl.Count; i++)
+                            points.Add(new NativePoint((float)pl[i].X, (float)pl[i].Y, (float)pl[i].Z));
+
+                        int segCount = pl.SegmentCount;
+                        for (int i = 0; i < segCount; i++)
+                        {
+                            if (pl[i].DistanceTo(pl[i + 1]) <= tol) continue;
+                            segments.Add(new NativeSegment(start + i, start + i + 1));
+                        }
                     }
-                    for (int i = 0; i < poly.Count - 1; i++)
-                    {
-                        segments.Add(new NativeSegment { A = start + i, B = start + i + 1 });
-                    }
-                    if (poly.IsClosed)
-                        segments.Add(new NativeSegment { A = start + poly.Count - 1, B = start });
                 }
             }
 
-            if (points.Count == 0 || segments.Count == 0)
-            {
-                return false;
-            }
+            var pArray = points.ToArray();
+            var sArray = segments.ToArray();
 
-            NativePointD[] pArray = points.ToArray();
-            NativeSegment[] sArray = segments.ToArray();
-            bool ok = false;
-            unsafe
+            bool ok;
+            fixed (NativePoint* pPtr = pArray)
+            fixed (NativeSegment* sPtr = sArray)
             {
-                fixed (NativePointD* pPtr = pArray)
-                fixed (NativeSegment* sPtr = sArray)
-                {
-                    ok = DendroFromCurves(this.Grid, pPtr, (nuint)pArray.Length, sPtr, (nuint)sArray.Length, vRadius, vSettings.VoxelSize, vSettings.Bandwidth);
-                }
+                ok = DendroFromCurves(this.Grid, pPtr, (nuint)pArray.Length, sPtr, (nuint)sArray.Length,
+                                      vRadius, vSettings.VoxelSize, vSettings.Bandwidth);
             }
-
             return ok;
         }
 

@@ -10,11 +10,6 @@ struct NativePoint
 	float x, y, z;
 };
 
-struct NativePointD
-{
-	double x, y, z;
-};
-
 struct NativeFace
 {
 	int a, b, c, d;
@@ -27,7 +22,6 @@ struct NativeSegment
 
 static_assert(sizeof(NativePoint) == 12, "NativePoint must be 12 bytes");
 static_assert(sizeof(NativeFace) == 16, "NativeFace must be 16 bytes");
-static_assert(sizeof(NativePointD) == 24, "NativePointD must be 24 bytes");
 static_assert(sizeof(NativeSegment) == 8, "NativeSegment must be 8 bytes");
 
 class NativeParticle

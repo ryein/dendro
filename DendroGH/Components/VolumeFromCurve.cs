@@ -49,13 +49,6 @@ namespace DendroGH
             if (!DA.GetData(1, ref vRadius)) return;
             if (!DA.GetData(2, ref vSettings)) return;
 
-            double minRadius = vSettings.VoxelSize / 0.6667;
-
-            if (vRadius <= minRadius)
-            {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Radius must be at least 33% larger than voxel size. This will compute but no volume will be created.");
-            }
-
             DendroVolume volume = new DendroVolume(vCurves, vRadius, vSettings);
 
             if (!volume.IsValid)

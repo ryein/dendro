@@ -77,43 +77,26 @@ DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int
 	return grid->FromMesh(vertices, triangles, quads, voxelSize, bandwidth);
 }
 
-DENDRO_API bool DendroFromCurves(DendroGrid *grid, const NativePointD *pts, size_t pCount, const NativeSegment *segs, size_t sCount, double radius, double voxelSize, double bandwidth)
+DENDRO_API bool DendroFromCurves(DendroGrid *grid, const NativePoint *pts, size_t pCount, const NativeSegment *segs, size_t sCount, double radius, double voxelSize, double bandwidth)
 {
-	// // vertices
-	// static_assert(std::is_trivially_copyable<openvdb::Vec3s>::value,
-	// 			  "Vec3s must be trivially copyable");
-	// static_assert(sizeof(openvdb::Vec3s) == sizeof(NativePoint),
-	// 			  "Vec3s must match NativePoint");
-	// std::vector<openvdb::Vec3s> pts(static_cast<size_t>(pCount));
-	// std::memcpy(pts.data(), vPoints, static_cast<size_t>(pCount) * sizeof(NativePoint));
+	if (!grid || (!pts && pCount) || (!segs && sCount))
+		return false;
 
-	// // segments -> Vec2I
-	// std::vector<openvdb::Vec2I> segs;
-	// segs.reserve(static_cast<size_t>(sCount));
-	// for (int i = 0; i < sCount; ++i)
-	// {
-	// 	const auto &s = vSegments[i];
-	// 	segs.emplace_back(s.a, s.b);
-	// }
-	std::vector<openvdb::math::Vec3s> P;
-	P.reserve(pCount);
-	for (size_t i = 0; i < pCount; ++i)
+	try
 	{
-		P.emplace_back(
-			static_cast<float>(pts[i].x),
-			static_cast<float>(pts[i].y),
-			static_cast<float>(pts[i].z));
-	}
+		// reinterpret incoming buffers and copy into vectors
+		const auto *vdbPts = reinterpret_cast<const openvdb::Vec3s *>(pts);
+		const auto *vdbSeg = reinterpret_cast<const openvdb::Vec2I *>(segs);
 
-	std::vector<openvdb::Vec2I> S;
-	S.reserve(sCount);
-	for (size_t i = 0; i < sCount; ++i)
+		std::vector<openvdb::Vec3s> points(vdbPts, vdbPts + pCount);
+		std::vector<openvdb::Vec2I> segments(vdbSeg, vdbSeg + sCount);
+
+		return grid->FromCurves(points, segments, radius, voxelSize, bandwidth);
+	}
+	catch (...)
 	{
-		S.emplace_back(segs[i].a, segs[i].b);
+		return false;
 	}
-
-	return grid->FromCurves(P, S, radius, voxelSize, bandwidth);
-	// return grid->FromCurves(pts, segs, radius, voxelSize, bandwidth);
 }
 
 // helper
