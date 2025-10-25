@@ -18,9 +18,34 @@ OpenVDB and all its dependencies are added to the supplied VCPKG manifest. Upon 
 
 Use Homebrew (`brew`) to install the dependencies for the C++ library:
 
+###### For Rhino 7 on Apple Silicon Macs
+Why it worked on Rhino 8 but not Rhino 7 -- 
+The main issue is an architecture mismatch: the libDendroAPI.dylib is compiled for ARM64, but Rhino/Grasshopper runs under Rosetta 2 (x86_64 emulation) on Apple Silicon Macs.
+You need to install x86_64 versions of the dependencies. On Apple Silicon Macs, you can have both ARM64 and x86_64 versions of Homebrew installed side by side.
+
+Create an x86_64 Homebrew installation (if you don't already have one)
+```
+arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Install x86_64 versions of the dependencies
+```
+arch -x86_64 /usr/local/bin/brew install openvdb tbb c-blosc
+```
+
 ```
 brew install boost cmake c-blosc openvdb tbb zlib
 ```
+
+```
+cd DendroAPI
+mkdir build
+cd build
+cmake .. -DCMAKE_OSX_ARCHITECTURES=x86_64
+make
+```
+
+##### For Rhino 8
 
 Run the following from the DendroAPI directory to compile using `cmake`:
 
