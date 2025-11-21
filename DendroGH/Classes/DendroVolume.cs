@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Mail;
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.Marshalling;
+using Rhino;
 using Rhino.Geometry;
 
 namespace DendroGH
@@ -512,9 +512,27 @@ namespace DendroGH
         /// <returns>boolean value for whether volume was built successfully</returns>
         public unsafe bool ToVolume(List<Curve> vCurves, double vRadius, DendroSettings vSettings)
         {
-            const double tol = 1e-9;
+            double tol = RhinoDoc.ActiveDoc?.ModelAbsoluteTolerance ?? 1e-6;
+            double tolSquared = tol * tol;
             var points = new List<NativePoint>();
             var segments = new List<NativeSegment>();
+
+            void AppendPolyline(IList<Point3d> polyline)
+            {
+                if (polyline == null || polyline.Count < 2) return;
+
+                int start = points.Count;
+                for (int i = 0; i < polyline.Count; i++)
+                    points.Add(new NativePoint((float)polyline[i].X, (float)polyline[i].Y, (float)polyline[i].Z));
+
+                int segCount = polyline.Count - 1;
+                for (int i = 0; i < segCount; i++)
+                {
+                    var seg = polyline[i + 1] - polyline[i];
+                    if (seg.SquareLength <= tolSquared) continue;
+                    segments.Add(new NativeSegment(start + i, start + i + 1));
+                }
+            }
 
             foreach (Curve crv in vCurves)
             {
@@ -523,15 +541,7 @@ namespace DendroGH
                 // lines or anything linear
                 if (crv.IsLinear())
                 {
-                    var a = crv.PointAtStart;
-                    var b = crv.PointAtEnd;
-                    if (a.DistanceTo(b) > tol)
-                    {
-                        int start = points.Count;
-                        points.Add(new NativePoint((float)a.X, (float)a.Y, (float)a.Z));
-                        points.Add(new NativePoint((float)b.X, (float)b.Y, (float)b.Z));
-                        segments.Add(new NativeSegment(start, start + 1));
-                    }
+                    AppendPolyline(new[] { crv.PointAtStart, crv.PointAtEnd });
                     continue;
                 }
 
@@ -540,24 +550,36 @@ namespace DendroGH
                 {
                     if (crv is PolylineCurve plc && plc.TryGetPolyline(out Polyline pl) || crv.TryGetPolyline(out pl))
                     {
-                        if (pl.Count < 2) continue;
-
-                        int start = points.Count;
-                        for (int i = 0; i < pl.Count; i++)
-                            points.Add(new NativePoint((float)pl[i].X, (float)pl[i].Y, (float)pl[i].Z));
-
-                        int segCount = pl.SegmentCount;
-                        for (int i = 0; i < segCount; i++)
-                        {
-                            if (pl[i].DistanceTo(pl[i + 1]) <= tol) continue;
-                            segments.Add(new NativeSegment(start + i, start + i + 1));
-                        }
+                        AppendPolyline(pl);
+                        continue;
                     }
                 }
+
+                // fallback: tessellate other curve types using voxel size as a chord length target
+                double chord = Math.Max(vSettings.VoxelSize, tol);
+                Point3d[] pts = null;
+                var divParams = crv.DivideByLength(chord, true);
+                if (divParams != null && divParams.Length > 0)
+                {
+                    pts = new Point3d[divParams.Length];
+                    for (int i = 0; i < divParams.Length; i++)
+                        pts[i] = crv.PointAt(divParams[i]);
+                }
+
+                if (pts == null || pts.Length < 2)
+                {
+                    // if length-based division failed (e.g. tiny curve), fall back to endpoints
+                    crv.DivideByCount(2, true, out pts);
+                }
+
+                AppendPolyline(pts);
             }
 
             var pArray = points.ToArray();
             var sArray = segments.ToArray();
+
+            if (pArray.Length == 0 || sArray.Length == 0)
+                return false;
 
             bool ok;
             fixed (NativePoint* pPtr = pArray)
