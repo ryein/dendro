@@ -514,24 +514,24 @@ namespace DendroGH
         {
             double tol = RhinoDoc.ActiveDoc?.ModelAbsoluteTolerance ?? 1e-6;
             double tolSquared = tol * tol;
-            var points = new List<NativePoint>();
-            var segments = new List<NativeSegment>();
+            double voxelSize = Math.Max(vSettings.VoxelSize, 0.01);
+            double bandwidth = Math.Max(vSettings.Bandwidth, 0.01);
 
-            void AppendPolyline(IList<Point3d> polyline)
+            var polylines = new List<Point3d[]>();
+            int pointCount = 0;
+            int segmentCount = 0;
+
+            void AppendPolyline(Point3d[] polyline)
             {
-                if (polyline == null || polyline.Count < 2) return;
+                if (polyline == null || polyline.Length < 2) return;
 
-                int start = points.Count;
-                for (int i = 0; i < polyline.Count; i++)
-                    points.Add(new NativePoint((float)polyline[i].X, (float)polyline[i].Y, (float)polyline[i].Z));
+                polylines.Add(polyline);
+                pointCount += polyline.Length;
 
-                int segCount = polyline.Count - 1;
+                int segCount = polyline.Length - 1;
                 for (int i = 0; i < segCount; i++)
-                {
-                    var seg = polyline[i + 1] - polyline[i];
-                    if (seg.SquareLength <= tolSquared) continue;
-                    segments.Add(new NativeSegment(start + i, start + i + 1));
-                }
+                    if ((polyline[i + 1] - polyline[i]).SquareLength > tolSquared)
+                        segmentCount++;
             }
 
             foreach (Curve crv in vCurves)
@@ -550,13 +550,13 @@ namespace DendroGH
                 {
                     if (crv is PolylineCurve plc && plc.TryGetPolyline(out Polyline pl) || crv.TryGetPolyline(out pl))
                     {
-                        AppendPolyline(pl);
+                        AppendPolyline(pl.ToArray());
                         continue;
                     }
                 }
 
                 // fallback: tessellate other curve types using voxel size as a chord length target
-                double chord = Math.Max(vSettings.VoxelSize, tol);
+                double chord = Math.Max(voxelSize, tol);
                 Point3d[] pts = null;
                 var divParams = crv.DivideByLength(chord, true);
                 if (divParams != null && divParams.Length > 0)
@@ -575,10 +575,35 @@ namespace DendroGH
                 AppendPolyline(pts);
             }
 
-            var pArray = points.ToArray();
-            var sArray = segments.ToArray();
+            if (pointCount == 0 || segmentCount == 0)
+                return false;
 
-            if (pArray.Length == 0 || sArray.Length == 0)
+            var pArray = new NativePoint[pointCount];
+            var sArray = new NativeSegment[segmentCount];
+
+            int pOffset = 0;
+            int sOffset = 0;
+
+            foreach (var polyline in polylines)
+            {
+                int segCount = polyline.Length - 1;
+                int start = pOffset;
+
+                for (int i = 0; i < polyline.Length; i++)
+                {
+                    var pt = polyline[i];
+                    pArray[pOffset++] = new NativePoint((float)pt.X, (float)pt.Y, (float)pt.Z);
+                }
+
+                for (int i = 0; i < segCount; i++)
+                {
+                    var seg = polyline[i + 1] - polyline[i];
+                    if (seg.SquareLength <= tolSquared) continue;
+                    sArray[sOffset++] = new NativeSegment(start + i, start + i + 1);
+                }
+            }
+
+            if (sOffset == 0)
                 return false;
 
             bool ok;
@@ -586,7 +611,7 @@ namespace DendroGH
             fixed (NativeSegment* sPtr = sArray)
             {
                 ok = DendroFromCurves(this.Grid, pPtr, (nuint)pArray.Length, sPtr, (nuint)sArray.Length,
-                                      vRadius, vSettings.VoxelSize, vSettings.Bandwidth);
+                                      vRadius, voxelSize, bandwidth);
             }
             return ok;
         }
