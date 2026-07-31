@@ -50,6 +50,30 @@ function Assert-Tool($name) {
     }
 }
 
+# --- Resolve a Ninja executable that can actually run
+function Resolve-Ninja {
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vswhere) {
+        $vsNinja = & $vswhere -latest -products * -find '**\ninja.exe' |
+            Select-Object -First 1
+        if ($vsNinja -and (Test-Path $vsNinja)) {
+            & $vsNinja --version *> $null
+            if ($LASTEXITCODE -eq 0) { return $vsNinja }
+        }
+    }
+
+    $pathNinja = Get-Command 'ninja' -ErrorAction SilentlyContinue
+    if ($pathNinja) {
+        try {
+            & $pathNinja.Source --version *> $null
+            if ($LASTEXITCODE -eq 0) { return $pathNinja.Source }
+        }
+        catch { }
+    }
+
+    throw "A working Ninja executable was not found. Repair the WinGet Ninja package or install the CMake tools included with Visual Studio."
+}
+
 # --- Ensure vcpkg exists and export vars for cmake
 function Assert-Vcpkg {
     if (-not (Test-Path $VcpkgDir)) { throw "Missing vcpkg repo at $VcpkgDir" }
@@ -62,10 +86,10 @@ function Assert-Vcpkg {
     $cfg = Get-Content (Join-Path $ApiDir 'vcpkg-configuration.json') -Raw | ConvertFrom-Json
     $baseline = $cfg.'default-registry'.baseline
 
-    if ($baseline -and -not (git -C $VcpkgDir rev-parse --verify $baseline 2>$null)) {
-        throw "vcpkg: baseline $baseline not found after fetch."
+    if ($baseline -and -not (git -c "safe.directory=$VcpkgDir" -C $VcpkgDir rev-parse --verify $baseline 2>$null)) {
+        throw "vcpkg: baseline $baseline is not present in the local vcpkg checkout."
     }
-    if ($baseline -and -not (git -C $VcpkgDir show "$baseline`:versions/baseline.json" 2>$null)) {
+    if ($baseline -and -not (git -c "safe.directory=$VcpkgDir" -C $VcpkgDir show "$baseline`:versions/baseline.json" 2>$null)) {
         throw "vcpkg: baseline $baseline is too old (missing versions/baseline.json). Update the baseline in vcpkg-configuration.json."
     }
 }
@@ -74,11 +98,13 @@ function Assert-Vcpkg {
 function Get-ReleaseVersion {
     param([string]$Version)
     $semver = '^(?<v>v)?(?<core>\d+\.\d+\.\d+)(?<pre>-[0-9A-Za-z\-\.]+)?(?<build>\+[0-9A-Za-z\-\.]+)?$'
+    $legacyVersion = '^(?<v>v)?(?<major>\d+)\.(?<minor>\d+)$'
 
     # Explicit version
     if ($Version) {
         $v = $Version.Trim()
         if ($v -match $semver) { return "$($Matches['core'])$($Matches['pre'])$($Matches['build'])" }
+        if ($v -match $legacyVersion) { return "$($Matches['major']).$($Matches['minor']).0" }
         throw "Version '$v' not valid semver. Use x.y.z or x.y.z-prerelease."
     }
 
@@ -88,6 +114,7 @@ function Get-ReleaseVersion {
     if ($tag) {
         $v = $tag.Trim()
         if ($v -match $semver) { return "$($Matches['core'])$($Matches['pre'])$($Matches['build'])" }
+        if ($v -match $legacyVersion) { return "$($Matches['major']).$($Matches['minor']).0" }
         throw "Git tag '$v' not valid semver. Use x.y.z or x.y.z-prerelease."
     }
 
@@ -97,15 +124,18 @@ function Get-ReleaseVersion {
 # --- Setup
 Enter-BuildEnv
 Assert-Tool 'cmake'
-Assert-Tool 'ninja'
 Assert-Tool 'dotnet'
 Assert-Vcpkg
+$NinjaPath = Resolve-Ninja
 
 # --- Build native C++ API with cmake/ninja
 Push-Location $ApiDir
 try {
-    & cmake --preset win-x64
+    & cmake --preset win-x64 "-DCMAKE_MAKE_PROGRAM=$NinjaPath"
+    if ($LASTEXITCODE -ne 0) { throw "CMake configure failed with exit code $LASTEXITCODE." }
+
     & cmake --build --preset win-x64-release
+    if ($LASTEXITCODE -ne 0) { throw "Native build failed with exit code $LASTEXITCODE." }
 }
 finally { Pop-Location }
 
@@ -124,7 +154,10 @@ else {
 }
 
 dotnet restore $Proj
+if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed with exit code $LASTEXITCODE." }
+
 dotnet build $Proj -c Release -v minimal /p:Platform=x64
+if ($LASTEXITCODE -ne 0) { throw "Grasshopper build failed with exit code $LASTEXITCODE." }
 
 # Locate .gha assembly
 $ghaPrimary = Join-Path $GhDir ("bin\x64\Release\{0}\DendroGH.gha" -f $tfm)

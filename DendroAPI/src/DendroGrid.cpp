@@ -79,11 +79,13 @@ bool DendroGrid::FromMesh(const std::vector<openvdb::Vec3s> &vertices, const std
 	// create linear transform that maps voxel indices to world space.
 	openvdb::math::Transform::Ptr xform = openvdb::math::Transform::createLinearTransform(voxelSize);
 
-	// converts bandwidth from world units to voxel space
-	const float voxBandwidth = static_cast<float>(bandwidth / voxelSize);
-
-	// create SDF levelset
-	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(*xform, vertices, triangles, quads, voxBandwidth);
+	// meshToLevelSet expects the narrow-band half-width in voxel units.
+	mGrid = openvdb::tools::meshToLevelSet<openvdb::FloatGrid>(
+		*xform,
+		vertices,
+		triangles,
+		quads,
+		static_cast<float>(bandwidth));
 
 	return true;
 }
@@ -92,11 +94,9 @@ bool DendroGrid::FromPoints(NativeParticle plist, double voxelSize, double bandw
 {
 	using GridT = openvdb::FloatGrid;
 
-	// converts bandwidth from world units to voxel space
-	const float voxBandwidth = static_cast<float>(bandwidth / voxelSize);
-
-	// Background encodes half-width in world units
-	GridT::Ptr sdf = GridT::create(voxBandwidth);
+	// Grid values are signed distances in world units, so the background value
+	// is the voxel-space half-width multiplied by the voxel size.
+	GridT::Ptr sdf = GridT::create(static_cast<float>(bandwidth * voxelSize));
 	sdf->setTransform(openvdb::math::Transform::createLinearTransform(voxelSize));
 	sdf->setGridClass(openvdb::GRID_LEVEL_SET);
 	sdf->setName("sdf");
@@ -115,13 +115,29 @@ bool DendroGrid::FromPoints(NativeParticle plist, double voxelSize, double bandw
 	return true;
 }
 
-bool DendroGrid::FromCurves(const std::vector<openvdb::Vec3s> &points, const std::vector<openvdb::Vec2I> &segments, double radius, double voxelSize, double bandwidth)
+bool DendroGrid::FromCurves(const std::vector<openvdb::Vec3s> &points, const std::vector<openvdb::Vec2I> &segments, const std::vector<float> &radii, double voxelSize, double bandwidth)
 {
-	// converts bandwidth from world units to voxel space
-	const float voxBandwidth = static_cast<float>(bandwidth / voxelSize);
-
-	// create the level set tube complex
-	mGrid = openvdb::tools::createLevelSetTubeComplex<openvdb::FloatGrid>(points, segments, static_cast<float>(radius), static_cast<float>(voxelSize), voxBandwidth);
+	// createLevelSetTubeComplex expects radii and voxel size in world units,
+	// and the narrow-band half-width in voxel units.
+	if (radii.size() == 1)
+	{
+		mGrid = openvdb::tools::createLevelSetTubeComplex<openvdb::FloatGrid>(
+			points,
+			segments,
+			radii.front(),
+			static_cast<float>(voxelSize),
+			static_cast<float>(bandwidth));
+	}
+	else
+	{
+		mGrid = openvdb::tools::createLevelSetTubeComplex<openvdb::FloatGrid>(
+			points,
+			segments,
+			radii,
+			static_cast<float>(voxelSize),
+			static_cast<float>(bandwidth),
+			openvdb::tools::TUBE_SEGMENT_RADII);
+	}
 
 	return true;
 }

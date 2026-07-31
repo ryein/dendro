@@ -77,9 +77,10 @@ DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int
 	return grid->FromMesh(vertices, triangles, quads, voxelSize, bandwidth);
 }
 
-DENDRO_API bool DendroFromCurves(DendroGrid *grid, const NativePoint *pts, size_t pCount, const NativeSegment *segs, size_t sCount, double radius, double voxelSize, double bandwidth)
+DENDRO_API bool DendroFromCurves(DendroGrid *grid, const NativePoint *pts, size_t pCount, const NativeSegment *segs, size_t sCount, const float *radii, size_t rCount, double voxelSize, double bandwidth)
 {
-	if (!grid || (!pts && pCount) || (!segs && sCount))
+	if (!grid || !pts || !segs || !radii || pCount == 0 || sCount == 0 ||
+		(rCount != 1 && rCount != sCount))
 		return false;
 
 	try
@@ -90,8 +91,9 @@ DENDRO_API bool DendroFromCurves(DendroGrid *grid, const NativePoint *pts, size_
 
 		std::vector<openvdb::Vec3s> points(vdbPts, vdbPts + pCount);
 		std::vector<openvdb::Vec2I> segments(vdbSeg, vdbSeg + sCount);
+		std::vector<float> curveRadii(radii, radii + rCount);
 
-		return grid->FromCurves(points, segments, radius, voxelSize, bandwidth);
+		return grid->FromCurves(points, segments, curveRadii, voxelSize, bandwidth);
 	}
 	catch (...)
 	{

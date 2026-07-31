@@ -17,7 +17,7 @@ namespace DendroGH {
         /// </summary>
         protected override void RegisterInputParams (GH_Component.GH_InputParamManager pManager) {
             pManager.AddNumberParameter ("Voxel Size", "S", "Size of voxels in the output volume", GH_ParamAccess.item, 1);
-            pManager.AddNumberParameter ("Bandwidth", "B", "Desired radius in voxel units around the surface", GH_ParamAccess.item, 1);
+            pManager.AddNumberParameter ("Bandwidth", "B", "Narrow-band half-width in voxels around the surface", GH_ParamAccess.item, 1);
             pManager.AddNumberParameter ("Isovalue", "I", "Crossing point of the volume that is considered the surface", GH_ParamAccess.item, 0.0);
             pManager.AddNumberParameter ("Adaptivity", "A", "Value range from 0-1. Higher adaptivities will allow more variation " +
                 "in polygon size, resulting in fewer polygons.", GH_ParamAccess.item, 0.1);
@@ -44,6 +44,22 @@ namespace DendroGH {
             if (!DA.GetData (1, ref bandwidth)) return;
             if (!DA.GetData (2, ref isoValue)) return;
             if (!DA.GetData (3, ref adaptivity)) return;
+
+            if (voxelSize <= 0.0 || double.IsNaN(voxelSize) || double.IsInfinity(voxelSize)) {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Voxel size must be a positive finite value.");
+                return;
+            }
+
+            if (bandwidth <= 0.0 || double.IsNaN(bandwidth) || double.IsInfinity(bandwidth)) {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Bandwidth must be a positive finite value measured in voxels.");
+                return;
+            }
+
+            if (bandwidth < 1.0) {
+                AddRuntimeMessage(
+                    GH_RuntimeMessageLevel.Warning,
+                    "Bandwidth is less than one voxel. Immediate meshing may work, but downstream volume operations can be unreliable.");
+            }
 
             DendroSettings vs = new DendroSettings ();
 
