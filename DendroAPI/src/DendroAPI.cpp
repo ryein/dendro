@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdlib>
 #include <cstring>
+#include <type_traits>
 
 // grid class constructors
 DENDRO_API DendroGrid *DendroCreate()
@@ -76,7 +77,31 @@ DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int
 	return grid->FromMesh(vertices, triangles, quads, voxelSize, bandwidth);
 }
 
-// helper to pack tris+quads into NativeFace with d==c convention
+DENDRO_API bool DendroFromCurves(DendroGrid *grid, const NativePoint *pts, size_t pCount, const NativeSegment *segs, size_t sCount, const float *radii, size_t rCount, double voxelSize, double bandwidth)
+{
+	if (!grid || !pts || !segs || !radii || pCount == 0 || sCount == 0 ||
+		(rCount != 1 && rCount != sCount))
+		return false;
+
+	try
+	{
+		// reinterpret incoming buffers and copy into vectors
+		const auto *vdbPts = reinterpret_cast<const openvdb::Vec3s *>(pts);
+		const auto *vdbSeg = reinterpret_cast<const openvdb::Vec2I *>(segs);
+
+		std::vector<openvdb::Vec3s> points(vdbPts, vdbPts + pCount);
+		std::vector<openvdb::Vec2I> segments(vdbSeg, vdbSeg + sCount);
+		std::vector<float> curveRadii(radii, radii + rCount);
+
+		return grid->FromCurves(points, segments, curveRadii, voxelSize, bandwidth);
+	}
+	catch (...)
+	{
+		return false;
+	}
+}
+
+// helper
 static void packFaces(const std::vector<openvdb::Vec3I> &tris, const std::vector<openvdb::Vec4I> &quads, NativeFace *outFaces)
 {
 	size_t k = 0;

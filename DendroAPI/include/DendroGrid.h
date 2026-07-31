@@ -26,6 +26,7 @@ public:
 
 	void ToMesh(std::vector<openvdb::Vec3s> &vertices, std::vector<openvdb::Vec3I> &triangles, std::vector<openvdb::Vec4I> &quads, double isovalue, double adaptivity);
 	bool FromPoints(NativeParticle plist, double voxelSize, double bandwidth);
+	bool FromCurves(const std::vector<openvdb::Vec3s> &points, const std::vector<openvdb::Vec2I> &segments, const std::vector<float> &radii, double voxelSize, double bandwidth);
 	bool FromMesh(const std::vector<openvdb::Vec3s> &vertices, const std::vector<openvdb::Vec3I> &triangles, const std::vector<openvdb::Vec4I> &quads, double voxelSize, double bandwidth);
 
 	void Transform(openvdb::math::Mat4d xform);

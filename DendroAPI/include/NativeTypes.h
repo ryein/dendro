@@ -15,8 +15,14 @@ struct NativeFace
 	int a, b, c, d;
 };
 
+struct NativeSegment
+{
+	int a, b;
+};
+
 static_assert(sizeof(NativePoint) == 12, "NativePoint must be 12 bytes");
 static_assert(sizeof(NativeFace) == 16, "NativeFace must be 16 bytes");
+static_assert(sizeof(NativeSegment) == 8, "NativeSegment must be 8 bytes");
 
 class NativeParticle
 {

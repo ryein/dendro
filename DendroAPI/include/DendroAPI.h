@@ -20,6 +20,7 @@ extern "C"
 	// volume conversion methods
 	extern DENDRO_API bool DendroFromPoints(DendroGrid *grid, const NativePoint *vPoints, size_t pCount, const float *vRadius, size_t rCount, double voxelSize, double bandwidth);
 	extern DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int vCount, const NativeFace *vFaces, int fCount, double voxelSize, double bandwidth);
+	extern DENDRO_API bool DendroFromCurves(DendroGrid *grid, const NativePoint *pts, size_t pCount, const NativeSegment *segs, size_t sCount, const float *radii, size_t rCount, double voxelSize, double bandwidth);
 	extern DENDRO_API bool DendroToMesh(DendroGrid *grid, NativePoint **vPoints, int *vCount, NativeFace **vFaces, int *fCount, double isovalue, double adaptivity);
 	extern DENDRO_API void DendroFree(void *ptr);
 

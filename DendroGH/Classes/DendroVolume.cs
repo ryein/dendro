@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.Marshalling;
+using Rhino;
 using Rhino.Geometry;
 
 namespace DendroGH
@@ -16,9 +15,28 @@ namespace DendroGH
     /// </summary>
     public class DendroVolume : IDisposable
     {
+        // Safety ceiling only: conversions fail above this count and never emit a
+        // lower-fidelity approximation to satisfy the limit.
+        private const int MaxCurveSegmentCount = 250000;
+
+        private static bool IsPositiveFinite(double value)
+        {
+            return value > 0.0 && !double.IsNaN(value) && !double.IsInfinity(value);
+        }
 
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
-        struct NativePoint { public float X, Y, Z; }
+        struct NativePoint
+        {
+            public float X, Y, Z;
+            public NativePoint(float x, float y, float z) { X = x; Y = y; Z = z; }
+        }
+
+        [StructLayout(LayoutKind.Sequential, Pack = 4)]
+        struct NativeSegment
+        {
+            public int A, B;
+            public NativeSegment(int a, int b) { A = a; B = b; }
+        }
 
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         struct NativeFace { public int A, B, C, D; }
@@ -72,6 +90,13 @@ namespace DendroGH
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
         private static extern unsafe bool DendroFromPoints(IntPtr grid, NativePoint* vPoints, nuint pCount, float* vRadius, nuint rCount, double voxelSize, double bandwidth);
+#if UNIX
+        [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
+#else
+        [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
+#endif
+        private static extern unsafe bool DendroFromCurves(IntPtr grid, NativePoint* pts, nuint pCount, NativeSegment* segs, nuint sCount, float* radii, nuint rCount, double voxelSize, double bandwidth);
+
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
 #else
@@ -249,16 +274,50 @@ namespace DendroGH
         /// <summary>
         /// curve constructor
         /// </summary>
-        /// <remark>must supply a single radius value or a list of radii equal to the number of curves supplied</remark>
         /// <param name="vCurves">curves to build volume from</param>
-        /// <param name="vRadius">radius values for each curve</param>
+        /// <param name="vRadius">uniform radius for all curves</param>
+        /// <param name="vSettings">voxelization settings to be used</param>
+        public DendroVolume(List<Curve> vCurves, double vRadius, DendroSettings vSettings)
+            : this(vCurves, new List<double> { vRadius }, vSettings, 0.0)
+        {
+        }
+
+        /// <summary>
+        /// curve constructor with control over adaptive polyline approximation
+        /// </summary>
+        /// <param name="vCurves">curves to build volume from</param>
+        /// <param name="vRadius">uniform radius for all curves</param>
+        /// <param name="vSettings">voxelization settings to be used</param>
+        /// <param name="curveDeviation">maximum world-space curve deviation, or zero for automatic</param>
+        public DendroVolume(List<Curve> vCurves, double vRadius, DendroSettings vSettings, double curveDeviation)
+            : this(vCurves, new List<double> { vRadius }, vSettings, curveDeviation)
+        {
+        }
+
+        /// <summary>
+        /// curve constructor accepting one uniform radius or one radius per curve
+        /// </summary>
+        /// <param name="vCurves">curves to build volume from</param>
+        /// <param name="vRadius">one uniform radius or one radius per supplied curve</param>
         /// <param name="vSettings">voxelization settings to be used</param>
         public DendroVolume(List<Curve> vCurves, List<double> vRadius, DendroSettings vSettings)
+            : this(vCurves, vRadius, vSettings, 0.0)
+        {
+        }
+
+        /// <summary>
+        /// curve constructor accepting radii and adaptive polyline control
+        /// </summary>
+        /// <param name="vCurves">curves to build volume from</param>
+        /// <param name="vRadius">one uniform radius or one radius per supplied curve</param>
+        /// <param name="vSettings">voxelization settings to be used</param>
+        /// <param name="curveDeviation">maximum world-space curve deviation, or zero for automatic</param>
+        public DendroVolume(List<Curve> vCurves, List<double> vRadius, DendroSettings vSettings, double curveDeviation)
         {
             // pinvoke grid creation
             this.Grid = DendroCreate();
 
-            this.IsValid = this.CreateFromCurves(vCurves, vRadius, vSettings);
+            this.IsValid = this.ToVolume(vCurves, vRadius, vSettings, curveDeviation);
         }
 
         /// <summary>
@@ -333,6 +392,11 @@ namespace DendroGH
         }
 
         /// <summary>
+        /// details about the most recent failed conversion
+        /// </summary>
+        public string ErrorMessage { get; private set; }
+
+        /// <summary>
         /// volume grid pointer property
         /// </summary>
         /// <returns>pointer to c++ grid</returns>
@@ -399,10 +463,12 @@ namespace DendroGH
         /// <returns>boolean value for whether volume was built successfully</returns>
         public unsafe bool ToVolume(Mesh vMesh, DendroSettings vSettings)
         {
-            if (vMesh == null || !vMesh.IsValid) return false;
+            if (vMesh == null || !vMesh.IsValid || vSettings == null ||
+                !IsPositiveFinite(vSettings.VoxelSize) || !IsPositiveFinite(vSettings.Bandwidth))
+                return false;
 
-            double voxelSize = Math.Max(0.01, vSettings.VoxelSize);
-            double bandwidth = Math.Max(0.01, vSettings.Bandwidth);
+            double voxelSize = vSettings.VoxelSize;
+            double bandwidth = vSettings.Bandwidth;
 
             // clean up mesh
             vMesh.Faces.CullDegenerateFaces();
@@ -447,9 +513,11 @@ namespace DendroGH
         /// <param name="vRadius">radius values for each point</param>
         /// <param name="vSettings">voxelization settings to be used</param>
         /// <returns>boolean value for whether volume was built successfully</returns>
-        public bool ToVolume(List<Point3d> vPoints, List<double> vRadius, DendroSettings vSettings)
+        public unsafe bool ToVolume(List<Point3d> vPoints, List<double> vRadius, DendroSettings vSettings)
         {
-            if (vPoints is null || vRadius is null) return false;
+            if (vPoints is null || vRadius is null || vSettings == null ||
+                !IsPositiveFinite(vSettings.VoxelSize) || !IsPositiveFinite(vSettings.Bandwidth))
+                return false;
 
             int pCount = vPoints.Count;
             if (pCount == 0) return false;
@@ -458,15 +526,18 @@ namespace DendroGH
             int rCount = vRadius.Count;
             if (rCount != 1 && rCount != pCount) return false;
 
-            double voxelSize = Math.Max(vSettings.VoxelSize, 0.01);
-            double bandwidth = Math.Max(vSettings.Bandwidth, 0.01);
+            if (vRadius.Exists(radius => !IsPositiveFinite(radius))) return false;
+            if (vPoints.Exists(point => !point.IsValid)) return false;
+
+            double voxelSize = vSettings.VoxelSize;
+            double bandwidth = vSettings.Bandwidth;
 
             // allocate once and fill
             var pArr = new NativePoint[pCount];
             for (int i = 0; i < pCount; i++)
             {
                 var p = vPoints[i];
-                pArr[i] = new NativePoint { X = (float)p.X, Y = (float)p.Y, Z = (float)p.Z };
+                pArr[i] = new NativePoint((float)p.X, (float)p.Y, (float)p.Z);
             }
 
             // radii: double -> float
@@ -481,6 +552,238 @@ namespace DendroGH
                     return DendroFromPoints(this.Grid, pPtr, (nuint)pCount, rPtr, (nuint)rCount, voxelSize, bandwidth);
                 }
             }
+        }
+
+        /// <summary>
+        /// build a volume from a supplied list of curves
+        /// </summary>
+        /// <param name="vCurves">curves to build volume from</param>
+        /// <param name="vRadius">uniform radius for all curves</param>
+        /// <param name="vSettings">voxelization settings to be used</param>
+        /// <returns>boolean value for whether volume was built successfully</returns>
+        public bool ToVolume(List<Curve> vCurves, double vRadius, DendroSettings vSettings)
+        {
+            return ToVolume(vCurves, new List<double> { vRadius }, vSettings, 0.0);
+        }
+
+        /// <summary>
+        /// build a volume from curves using an adaptive polyline approximation
+        /// </summary>
+        /// <param name="vCurves">curves to build volume from</param>
+        /// <param name="vRadius">uniform radius for all curves</param>
+        /// <param name="vSettings">voxelization settings to be used</param>
+        /// <param name="curveDeviation">maximum world-space curve deviation, or zero for automatic</param>
+        /// <returns>boolean value for whether volume was built successfully</returns>
+        public unsafe bool ToVolume(List<Curve> vCurves, double vRadius, DendroSettings vSettings, double curveDeviation)
+        {
+            return ToVolume(vCurves, new List<double> { vRadius }, vSettings, curveDeviation);
+        }
+
+        /// <summary>
+        /// build a volume from curves using one uniform radius or one radius per curve
+        /// </summary>
+        /// <param name="vCurves">curves to build volume from</param>
+        /// <param name="vRadius">one uniform radius or one radius per supplied curve</param>
+        /// <param name="vSettings">voxelization settings to be used</param>
+        /// <returns>boolean value for whether volume was built successfully</returns>
+        public bool ToVolume(List<Curve> vCurves, List<double> vRadius, DendroSettings vSettings)
+        {
+            return ToVolume(vCurves, vRadius, vSettings, 0.0);
+        }
+
+        /// <summary>
+        /// build a volume from curves using radii and an adaptive polyline approximation
+        /// </summary>
+        /// <param name="vCurves">curves to build volume from</param>
+        /// <param name="vRadius">one uniform radius or one radius per supplied curve</param>
+        /// <param name="vSettings">voxelization settings to be used</param>
+        /// <param name="curveDeviation">maximum world-space curve deviation, or zero for automatic</param>
+        /// <returns>boolean value for whether volume was built successfully</returns>
+        public unsafe bool ToVolume(List<Curve> vCurves, List<double> vRadius, DendroSettings vSettings, double curveDeviation)
+        {
+            ErrorMessage = null;
+
+            if (vCurves == null || vRadius == null || vSettings == null)
+            {
+                ErrorMessage = "Curves, radii, and volume settings are required.";
+                return false;
+            }
+
+            if (vCurves.Count == 0)
+            {
+                ErrorMessage = "At least one curve is required.";
+                return false;
+            }
+
+            if (vRadius.Count != 1 && vRadius.Count != vCurves.Count)
+            {
+                ErrorMessage = $"Supply either one radius or exactly one radius per curve ({vCurves.Count} values).";
+                return false;
+            }
+
+            if (vRadius.Exists(radius => !IsPositiveFinite(radius)))
+            {
+                ErrorMessage = "Every curve radius must be a positive finite value.";
+                return false;
+            }
+
+            if (double.IsNaN(curveDeviation) || double.IsInfinity(curveDeviation) || curveDeviation < 0.0)
+            {
+                ErrorMessage = "Curve deviation must be zero (automatic) or a positive finite value.";
+                return false;
+            }
+
+            if (!IsPositiveFinite(vSettings.VoxelSize))
+            {
+                ErrorMessage = "Voxel size must be a positive finite value.";
+                return false;
+            }
+
+            if (!IsPositiveFinite(vSettings.Bandwidth))
+            {
+                ErrorMessage = "Bandwidth must be a positive finite value measured in voxels.";
+                return false;
+            }
+
+            double tol = RhinoDoc.ActiveDoc?.ModelAbsoluteTolerance ?? 1e-6;
+            double tolSquared = tol * tol;
+            double voxelSize = vSettings.VoxelSize;
+            double bandwidth = vSettings.Bandwidth;
+            double effectiveDeviation = curveDeviation > 0.0
+                ? curveDeviation
+                : Math.Max(tol, voxelSize * 0.25);
+
+            var polylines = new List<Point3d[]>();
+            var polylineRadii = new List<double>();
+            int pointCount = 0;
+            int segmentCount = 0;
+
+            bool AppendPolyline(Point3d[] polyline, double radius)
+            {
+                if (polyline == null || polyline.Length < 2) return true;
+
+                int validSegmentCount = 0;
+                for (int i = 0; i < polyline.Length - 1; i++)
+                {
+                    if ((polyline[i + 1] - polyline[i]).SquareLength > tolSquared)
+                        validSegmentCount++;
+                }
+
+                if (validSegmentCount == 0) return true;
+
+                if (validSegmentCount > MaxCurveSegmentCount - segmentCount)
+                {
+                    ErrorMessage = $"Curve conversion exceeded the {MaxCurveSegmentCount:N0}-segment safety limit. Increase Curve Deviation or supply a simpler polyline.";
+                    return false;
+                }
+
+                polylines.Add(polyline);
+                polylineRadii.Add(radius);
+                pointCount += polyline.Length;
+                segmentCount += validSegmentCount;
+                return true;
+            }
+
+            for (int curveIndex = 0; curveIndex < vCurves.Count; curveIndex++)
+            {
+                Curve crv = vCurves[curveIndex];
+                if (crv == null || !crv.IsValid) continue;
+
+                double radius = vRadius.Count == 1 ? vRadius[0] : vRadius[curveIndex];
+
+                // lines or anything linear
+                if (crv.IsLinear())
+                {
+                    if (!AppendPolyline(new[] { crv.PointAtStart, crv.PointAtEnd }, radius))
+                        return false;
+                    continue;
+                }
+
+                // polylines or similar
+                if (crv.IsPolyline())
+                {
+                    if (crv is PolylineCurve plc && plc.TryGetPolyline(out Polyline pl) || crv.TryGetPolyline(out pl))
+                    {
+                        if (!AppendPolyline(pl.ToArray(), radius))
+                            return false;
+                        continue;
+                    }
+                }
+
+                // Adaptively approximate other curve types. A pi angle tolerance and
+                // zero length constraints leave world-space deviation as the driver.
+                using (PolylineCurve approximation = crv.ToPolyline(
+                    effectiveDeviation,
+                    Math.PI,
+                    0.0,
+                    0.0))
+                {
+                    if (approximation == null || !approximation.TryGetPolyline(out Polyline approximationPolyline))
+                    {
+                        ErrorMessage = "Rhino could not create a polyline approximation for one of the supplied curves.";
+                        return false;
+                    }
+
+                    if (!AppendPolyline(approximationPolyline.ToArray(), radius))
+                        return false;
+                }
+            }
+
+            if (pointCount == 0 || segmentCount == 0)
+            {
+                ErrorMessage = "No valid curve segments were supplied.";
+                return false;
+            }
+
+            var pArray = new NativePoint[pointCount];
+            var sArray = new NativeSegment[segmentCount];
+            var rArray = new float[vRadius.Count == 1 ? 1 : segmentCount];
+            if (vRadius.Count == 1)
+                rArray[0] = (float)vRadius[0];
+
+            int pOffset = 0;
+            int sOffset = 0;
+
+            for (int polylineIndex = 0; polylineIndex < polylines.Count; polylineIndex++)
+            {
+                Point3d[] polyline = polylines[polylineIndex];
+                int segCount = polyline.Length - 1;
+                int start = pOffset;
+
+                for (int i = 0; i < polyline.Length; i++)
+                {
+                    var pt = polyline[i];
+                    pArray[pOffset++] = new NativePoint((float)pt.X, (float)pt.Y, (float)pt.Z);
+                }
+
+                for (int i = 0; i < segCount; i++)
+                {
+                    var seg = polyline[i + 1] - polyline[i];
+                    if (seg.SquareLength <= tolSquared) continue;
+                    sArray[sOffset] = new NativeSegment(start + i, start + i + 1);
+                    if (vRadius.Count != 1)
+                        rArray[sOffset] = (float)polylineRadii[polylineIndex];
+                    sOffset++;
+                }
+            }
+
+            if (sOffset == 0)
+            {
+                ErrorMessage = "No non-degenerate curve segments were produced.";
+                return false;
+            }
+
+            bool ok;
+            fixed (NativePoint* pPtr = pArray)
+            fixed (NativeSegment* sPtr = sArray)
+            fixed (float* rPtr = rArray)
+            {
+                ok = DendroFromCurves(this.Grid, pPtr, (nuint)pArray.Length, sPtr, (nuint)sArray.Length,
+                                      rPtr, (nuint)rArray.Length, voxelSize, bandwidth);
+            }
+            if (!ok)
+                ErrorMessage = "OpenVDB failed to create a level-set tube from the supplied curves.";
+            return ok;
         }
 
         /// <summary>
@@ -533,61 +836,6 @@ namespace DendroGH
                 DendroFree(vPtr);
                 DendroFree(fPtr);
             }
-        }
-
-
-        /// <summary>
-        /// build a volume from a supplied list of curves
-        /// </summary>
-        /// <remark>must supply a single radius value or a list of radii equal to the number of curves supplied</remark>
-        /// <param name="vCurves">curves to build volume from</param>
-        /// <param name="vRadius">radius values for each curve</param>
-        /// <param name="vSettings">voxelization settings to be used</param>
-        /// <returns>boolean value for whether volume was built successfully</returns>
-        public bool CreateFromCurves(List<Curve> vCurves, List<double> vRadius, DendroSettings vSettings)
-        {
-            // there were no curves/radius supplied so exit
-            if (vCurves.Count == 0 || vRadius.Count == 0)
-                return false;
-
-            // check for invalid voxelsize settings
-            if (vSettings.VoxelSize < 0.01)
-                vSettings.VoxelSize = 0.01;
-
-            // check for invalid bandwidth settings
-            if (vSettings.Bandwidth < 1)
-                vSettings.Bandwidth = 1;
-
-            // // find out if we were supplied a single radius value or multiple values
-            // int method = GetCurveSolverMethod(vCurves.Count, vRadius.Count);
-
-            // bool validInput = false;
-            // List<float> rValues = new List<float>();
-            // List<Point3d> vPoints = new List<Point3d>();
-
-            // switch (method)
-            // {
-            //     // only a single radius was supplied
-            //     case 1:
-            //         validInput = ResolveSingleRadius(vCurves, vRadius[0], out vPoints, out rValues);
-            //         break;
-
-            //     // multiple radius values were supplied
-            //     case 2:
-            //         validInput = ResolveMultipleRadius(vCurves, vRadius, out vPoints, out rValues);
-            //         break;
-            //     default:
-            //         validInput = false;
-            //         break;
-            // }
-
-            // // supplied values were not valid so exit
-            // if (!validInput)
-            //     return false;
-
-            // // return results from point to volume function
-            // return this.ToVolume(vPoints, rValues, vSettings);
-            return true;
         }
 
         /// <summary>
@@ -960,145 +1208,6 @@ namespace DendroGH
 
         #region Display
         #endregion Display
-
-        #region Helpers
-        /// <summary>
-        /// create a point set, with a corresponding radius value list, for every curve. each curve provided
-        /// is divided into points, using its supplied radius value and then added to the whole point set.
-        /// </summary>
-        /// <remark>called from CreateFromCurve when multiple radius values are supplied</remark>
-        /// <param name="vCurves">curves to divide into points</param>
-        /// <param name="cRadius">desired radius value for the points of each curve</param>
-        /// <param name="vPoints">list to store all points for every curve</param>
-        /// <param name="vRadius">list to store all radius values for every point in vPoints</param>
-        /// <returns>boolean with whether operation was successful</returns>
-        private bool ResolveMultipleRadius(List<Curve> vCurves, List<double> cRadius, out List<Point3d> vPoints, out List<double> vRadius)
-        {
-            vRadius = new List<double>();
-            vPoints = new List<Point3d>();
-
-            int rIndex = 0;
-
-            foreach (Curve crv in vCurves)
-            {
-                var radius = cRadius[rIndex];
-
-                if (radius > 0)
-                {
-
-                    List<Point3d> vp = this.CurveToPoints(crv, radius);
-                    List<double> rv = Enumerable.Repeat(radius, vp.Count).ToList();
-                    vPoints.AddRange(vp);
-                    vRadius.AddRange(rv);
-                }
-                else
-                {
-                    return false;
-                }
-
-                rIndex++;
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// create a point set, with a corresponding radius value list, for every curve. each curve provided
-        /// is divided into points, using its supplied radius value and then added to the whole point set.
-        /// </summary>
-        /// <remark>called from CreateFromCurve when a single radius value is supplied</remark>
-        /// <param name="vCurves">curves to divide into points</param>
-        /// <param name="cRadius">desired radius value for the points of each curve</param>
-        /// <param name="vPoints">list to store all points for every curve</param>
-        /// <param name="vRadius">list to store all radius values for every point in vPoints</param>
-        /// <returns>boolean with whether operation was successful</returns>
-        private bool ResolveSingleRadius(List<Curve> vCurves, double cRadius, out List<Point3d> vPoints, out List<double> vRadius)
-        {
-            vRadius = new List<double>();
-            vPoints = new List<Point3d>();
-
-            if (cRadius > 0)
-            {
-                // divide every curve provided into points
-                foreach (Curve crv in vCurves)
-                {
-                    List<Point3d> vp = this.CurveToPoints(crv, cRadius);
-                    vPoints.AddRange(vp);
-                }
-
-                // make a radius list which is the same size of point set
-                vRadius = Enumerable.Repeat(cRadius, vPoints.Count).ToList();
-
-            }
-            else
-            {
-                return false;
-            }
-
-            return true;
-        }
-
-        /// <summary>
-        /// solves whether single or multiple radius values were provided to CreateFromCurve()
-        /// </summary>
-        /// <remark>this is used to tell CreateFromCurve how to proceed in dividing curves into points</remark>
-        /// <param name="cCount">curve count</param>
-        /// <param name="rCount">radius count</param>
-        /// <returns>method needed for breaking curves into point (1 - single radius provided, 2 - multiple radius provided)</returns>
-        private int GetCurveSolverMethod(int cCount, int rCount)
-        {
-            // no radius provided
-            if (rCount == 0)
-            {
-                return 0;
-            }
-
-            // single radius provided
-            if (rCount == 1)
-            {
-                return 1;
-            }
-
-            // multiple radius provided (equal in amount to curves provided)
-            if (rCount == cCount)
-            {
-                return 2;
-            }
-
-            return 0;
-        }
-
-        /// <summary>
-        /// divide a curve into point based on a desired radius value
-        /// </summary>
-        /// <param name="crv">curve to divide</param>
-        /// <param name="radius">desired point radius value</param>
-        /// <returns>list of divided points from curve</returns>
-        private List<Point3d> CurveToPoints(Curve crv, double radius)
-        {
-
-            List<Point3d> cPoints = new List<Point3d>();
-
-            // Curve longer than a 1/4 of radius
-            if (crv.GetLength() > radius * 0.25)
-            {
-                var cParams = crv.DivideByLength(radius * 0.25, true);
-                foreach (double param in cParams)
-                {
-                    Point3d pt = crv.PointAt(param);
-                    cPoints.Add(pt);
-                }
-            }
-            // If curve too short add endpoints to point list
-            else
-            {
-                cPoints.Add(crv.PointAtNormalizedLength(0));
-                cPoints.Add(crv.PointAtNormalizedLength(1));
-            }
-
-            return cPoints;
-        }
-        #endregion Helpers
 
     }
 }

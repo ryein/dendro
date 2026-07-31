@@ -13,7 +13,7 @@ namespace DendroGH
 
         #region Members
         private double mAdaptivity = 0.1; // higher adaptivity will allow more variation in polygon size, resulting in fewer polygons
-        private double mBandwidth = 1.0; // desired radius in voxel units around the surface
+        private double mBandwidth = 1.0; // narrow-band half-width in voxel units
         private double mIsovalue = 0.01; // crossing point of the volume that is considered the surface
         private double mVoxelSize = 0.5; // size of voxels in the output volume
         #endregion Members

@@ -27,9 +27,11 @@ CTestTestfile.cmake
 # vcpkg build artifacts
 vcpkg_installed/
 .vcpkg-root
-.vcpkg-cache
+.vcpkg_cache/
 .vcpkg/
 /vcpkg
+.vscode/
+
 
 # Visual Studio (if devs open in VS Folder View)
 .vs/

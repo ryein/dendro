@@ -23,8 +23,19 @@ namespace DendroGH
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
             pManager.AddCurveParameter("Curves", "C", "Curves", GH_ParamAccess.list);
-            pManager.AddNumberParameter("Curve Radius", "R", "Supply one value or a list of values equal to the number of curves supplied", GH_ParamAccess.list);
+            pManager.AddNumberParameter(
+                "Curve Radius",
+                "R",
+                "Supply one radius for all curves or one radius per supplied curve",
+                GH_ParamAccess.list);
             pManager.AddGenericParameter("Settings", "S", "Settings for converting different geometry types to and from volumes", GH_ParamAccess.item);
+            pManager.AddNumberParameter(
+                "Curve Deviation",
+                "D",
+                "Maximum world-space deviation between input curves and their polyline approximation. Use 0 for automatic.",
+                GH_ParamAccess.item,
+                0.0);
+            pManager[3].Optional = true;
         }
 
         /// <summary>
@@ -44,26 +55,61 @@ namespace DendroGH
             List<Curve> vCurves = new List<Curve>();
             List<double> vRadius = new List<double>();
             DendroSettings vSettings = new DendroSettings();
+            double curveDeviation = 0.0;
 
             if (!DA.GetDataList(0, vCurves)) return;
             if (!DA.GetDataList(1, vRadius)) return;
             if (!DA.GetData(2, ref vSettings)) return;
+            DA.GetData(3, ref curveDeviation);
 
-            double minRadius = vSettings.VoxelSize / 0.6667;
-
-            foreach (double radius in vRadius)
+            if (vSettings == null)
             {
-                if (radius <= minRadius)
-                {
-                    AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Radius must be at least 33% larger than voxel size. This will compute but no volume will be created.");
-                }
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Volume settings are required.");
+                return;
             }
 
-            DendroVolume volume = new DendroVolume(vCurves, vRadius, vSettings);
+            if (curveDeviation < 0.0 || double.IsNaN(curveDeviation) || double.IsInfinity(curveDeviation))
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Curve deviation must be zero (automatic) or a positive finite value.");
+                return;
+            }
+
+            var invalidCurveIndices = vCurves
+                .Select((curve, index) => new { curve, index })
+                .Where(item => item.curve == null || !item.curve.IsValid)
+                .Select(item => item.index)
+                .ToList();
+
+            if (invalidCurveIndices.Count > 0)
+            {
+                const int displayedIndexLimit = 20;
+                string displayedIndices = string.Join(", ", invalidCurveIndices.Take(displayedIndexLimit));
+                string remainder = invalidCurveIndices.Count > displayedIndexLimit
+                    ? $" (+{invalidCurveIndices.Count - displayedIndexLimit} more)"
+                    : string.Empty;
+                AddRuntimeMessage(
+                    GH_RuntimeMessageLevel.Warning,
+                    $"Skipped invalid curves at zero-based indices: {displayedIndices}{remainder}.");
+            }
+
+            double voxelSize = vSettings.VoxelSize;
+            if (voxelSize > 0.0 && !double.IsNaN(voxelSize) && !double.IsInfinity(voxelSize) &&
+                curveDeviation > 0.0 && curveDeviation < voxelSize * 0.1)
+            {
+                AddRuntimeMessage(
+                    GH_RuntimeMessageLevel.Warning,
+                    "Curve deviation is less than 10% of the voxel size. This may add substantial computation without visible voxel-level detail.");
+            }
+
+            DendroVolume volume = new DendroVolume(vCurves, vRadius, vSettings, curveDeviation);
 
             if (!volume.IsValid)
             {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Conversion failed. Make sure you supplied valid radius values or valid settings");
+                string error = string.IsNullOrWhiteSpace(volume.ErrorMessage)
+                    ? "Conversion failed. Make sure you supplied valid curves, radius, and settings."
+                    : volume.ErrorMessage;
+                volume.Dispose();
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, error);
                 return;
             }
 
