@@ -38,9 +38,15 @@ namespace DendroGH {
             if (!DA.GetData (0, ref vMesh)) return;
             if (!DA.GetData (1, ref vSettings)) return;
 
+            if (vSettings == null) {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Volume settings are required.");
+                return;
+            }
+
             DendroVolume volume = new DendroVolume (vMesh, vSettings);
 
             if (!volume.IsValid) {
+                volume.Dispose();
                 AddRuntimeMessage (GH_RuntimeMessageLevel.Error, "Conversion failed. Make sure you supplied a valid mesh and correct settings");
                 return;
             }

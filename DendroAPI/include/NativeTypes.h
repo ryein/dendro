@@ -4,6 +4,7 @@
 #define __NATIVETYPES_H__
 
 #include <openvdb/Types.h>
+#include <algorithm>
 
 struct NativePoint
 {
@@ -55,6 +56,22 @@ public:
 	float getRadius(size_t i) const
 	{
 		return m_radii ? m_radii[(m_rCount == 1) ? 0 : i] : 1.0f;
+	}
+
+	float getMaxRadius() const
+	{
+		if (!m_radii || m_rCount == 0)
+			return 0.0f;
+
+		float maxRadius = m_radii[0];
+		for (size_t i = 1; i < m_rCount; ++i)
+			maxRadius = std::max(maxRadius, m_radii[i]);
+		return maxRadius;
+	}
+
+	bool hasUniformRadius() const
+	{
+		return m_rCount == 1;
 	}
 
 private:

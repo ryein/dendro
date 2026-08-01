@@ -24,6 +24,19 @@ namespace DendroGH
             return value > 0.0 && !double.IsNaN(value) && !double.IsInfinity(value);
         }
 
+        private static string FormatZeroBasedIndices(IReadOnlyList<int> indices, int limit = 20)
+        {
+            int displayedCount = Math.Min(indices.Count, limit);
+            var displayed = new string[displayedCount];
+            for (int i = 0; i < displayedCount; i++)
+                displayed[i] = indices[i].ToString();
+
+            string remainder = indices.Count > limit
+                ? $" (+{indices.Count - limit} more)"
+                : string.Empty;
+            return string.Join(", ", displayed) + remainder;
+        }
+
         [StructLayout(LayoutKind.Sequential, Pack = 4)]
         struct NativePoint
         {
@@ -68,6 +81,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
+        [return: MarshalAs(UnmanagedType.I1)]
         static private extern bool DendroRead(IntPtr grid, string filename);
 
 #if UNIX
@@ -75,6 +89,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
+        [return: MarshalAs(UnmanagedType.I1)]
         static private extern bool DendroWrite(IntPtr grid, string filename);
 
 
@@ -83,18 +98,21 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
+        [return: MarshalAs(UnmanagedType.I1)]
         static private extern unsafe bool DendroFromMesh(IntPtr grid, NativePoint* vertices, int vertexCount, NativeFace* faces, int faceCount, double voxelSize, double bandwidth);
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
+        [return: MarshalAs(UnmanagedType.I1)]
         private static extern unsafe bool DendroFromPoints(IntPtr grid, NativePoint* vPoints, nuint pCount, float* vRadius, nuint rCount, double voxelSize, double bandwidth);
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
+        [return: MarshalAs(UnmanagedType.I1)]
         private static extern unsafe bool DendroFromCurves(IntPtr grid, NativePoint* pts, nuint pCount, NativeSegment* segs, nuint sCount, float* radii, nuint rCount, double voxelSize, double bandwidth);
 
 #if UNIX
@@ -102,6 +120,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
+        [return: MarshalAs(UnmanagedType.I1)]
         static private extern bool DendroToMesh(IntPtr grid, out IntPtr vertices, out int vCount, out IntPtr faces, out int fCount, double isovalue, double adaptivity);
 
 #if UNIX
@@ -116,6 +135,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
+        [return: MarshalAs(UnmanagedType.I1)]
         static private extern bool DendroTransform(IntPtr grid, double[] matrix, int mCount);
 
 #if UNIX
@@ -151,7 +171,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
-        static private extern void DendroOffsetMask(IntPtr grid, double amount, IntPtr mask, double min, double max, bool invert);
+        static private extern void DendroOffsetMask(IntPtr grid, double amount, IntPtr mask, double min, double max, [MarshalAs(UnmanagedType.I1)] bool invert);
 
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
@@ -165,7 +185,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
-        static private extern void DendroSmoothMask(IntPtr grid, int type, int iterations, int width, IntPtr mask, double min, double max, bool invert);
+        static private extern void DendroSmoothMask(IntPtr grid, int type, int iterations, int width, IntPtr mask, double min, double max, [MarshalAs(UnmanagedType.I1)] bool invert);
 
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
@@ -179,7 +199,7 @@ namespace DendroGH
 #else
         [DllImport("DendroAPI.dll", CallingConvention = CallingConvention.Cdecl)]
 #endif
-        static private extern void DendroBlendMask(IntPtr bGrid, IntPtr eGrid, double bPosition, double bEnd, IntPtr mask, double min, double max, bool invert);
+        static private extern void DendroBlendMask(IntPtr bGrid, IntPtr eGrid, double bPosition, double bEnd, IntPtr mask, double min, double max, [MarshalAs(UnmanagedType.I1)] bool invert);
 
 #if UNIX
         [DllImport("libDendroAPI.dylib", CallingConvention = CallingConvention.Cdecl)]
@@ -241,6 +261,8 @@ namespace DendroGH
 
             // read vdb file
             this.IsValid = this.Read(vFile);
+            if (!this.IsValid)
+                this.Dispose();
         }
 
         /// <summary>
@@ -254,6 +276,8 @@ namespace DendroGH
             this.Grid = DendroCreate();
 
             this.IsValid = this.ToVolume(vMesh, vSettings);
+            if (!this.IsValid)
+                this.Dispose();
         }
 
         /// <summary>
@@ -269,6 +293,8 @@ namespace DendroGH
             this.Grid = DendroCreate();
 
             this.IsValid = this.ToVolume(vPoints, vRadius, vSettings);
+            if (!this.IsValid)
+                this.Dispose();
         }
 
         /// <summary>
@@ -318,6 +344,8 @@ namespace DendroGH
             this.Grid = DendroCreate();
 
             this.IsValid = this.ToVolume(vCurves, vRadius, vSettings, curveDeviation);
+            if (!this.IsValid)
+                this.Dispose();
         }
 
         /// <summary>
@@ -395,6 +423,12 @@ namespace DendroGH
         /// details about the most recent failed conversion
         /// </summary>
         public string ErrorMessage { get; private set; }
+
+        /// <summary>
+        /// original zero-based indices of points skipped because their radius
+        /// was below OpenVDB's 1.5-voxel sampling minimum
+        /// </summary>
+        public IReadOnlyList<int> SkippedPointIndices { get; private set; } = Array.Empty<int>();
 
         /// <summary>
         /// volume grid pointer property
@@ -515,41 +549,153 @@ namespace DendroGH
         /// <returns>boolean value for whether volume was built successfully</returns>
         public unsafe bool ToVolume(List<Point3d> vPoints, List<double> vRadius, DendroSettings vSettings)
         {
-            if (vPoints is null || vRadius is null || vSettings == null ||
-                !IsPositiveFinite(vSettings.VoxelSize) || !IsPositiveFinite(vSettings.Bandwidth))
+            ErrorMessage = null;
+            SkippedPointIndices = Array.Empty<int>();
+
+            if (vPoints == null)
+            {
+                ErrorMessage = "A point list is required.";
                 return false;
+            }
+
+            if (vRadius == null)
+            {
+                ErrorMessage = "A point-radius list is required.";
+                return false;
+            }
+
+            if (vSettings == null)
+            {
+                ErrorMessage = "Volume settings are required.";
+                return false;
+            }
 
             int pCount = vPoints.Count;
-            if (pCount == 0) return false;
+            if (pCount == 0)
+            {
+                ErrorMessage = "At least one point is required.";
+                return false;
+            }
 
             // allow one uniform radius or per point radius
             int rCount = vRadius.Count;
-            if (rCount != 1 && rCount != pCount) return false;
+            if (rCount != 1 && rCount != pCount)
+            {
+                ErrorMessage =
+                    $"Received {rCount} point-radius values for {pCount} points. " +
+                    $"Supply either one uniform radius or exactly {pCount} radii.";
+                return false;
+            }
 
-            if (vRadius.Exists(radius => !IsPositiveFinite(radius))) return false;
-            if (vPoints.Exists(point => !point.IsValid)) return false;
+            if (!IsPositiveFinite(vSettings.VoxelSize))
+            {
+                ErrorMessage = "Voxel size must be a positive finite value.";
+                return false;
+            }
+
+            if (!IsPositiveFinite(vSettings.Bandwidth))
+            {
+                ErrorMessage = "Bandwidth must be a positive finite value measured in voxels.";
+                return false;
+            }
+
+            var invalidRadiusIndices = new List<int>();
+            for (int i = 0; i < rCount; i++)
+            {
+                double radius = vRadius[i];
+                if (!IsPositiveFinite(radius) || radius > float.MaxValue)
+                    invalidRadiusIndices.Add(i);
+            }
+
+            if (invalidRadiusIndices.Count > 0)
+            {
+                ErrorMessage = rCount == 1
+                    ? "The uniform point radius must be positive, finite, and representable in native single precision."
+                    : $"Invalid point radii at zero-based point indices: {FormatZeroBasedIndices(invalidRadiusIndices)}. " +
+                      "Radii must be positive, finite, and representable in native single precision.";
+                return false;
+            }
+
+            var invalidPointIndices = new List<int>();
+            for (int i = 0; i < pCount; i++)
+            {
+                Point3d point = vPoints[i];
+                if (!point.IsValid ||
+                    Math.Abs(point.X) > float.MaxValue ||
+                    Math.Abs(point.Y) > float.MaxValue ||
+                    Math.Abs(point.Z) > float.MaxValue)
+                    invalidPointIndices.Add(i);
+            }
+
+            if (invalidPointIndices.Count > 0)
+            {
+                ErrorMessage =
+                    $"Invalid points at zero-based indices: {FormatZeroBasedIndices(invalidPointIndices)}. " +
+                    "Point coordinates must be finite and representable in native single precision.";
+                return false;
+            }
 
             double voxelSize = vSettings.VoxelSize;
             double bandwidth = vSettings.Bandwidth;
+            double minimumRadius = 1.5 * voxelSize;
+            var skippedIndices = new List<int>();
+            int acceptedPointCount = 0;
 
-            // allocate once and fill
-            var pArr = new NativePoint[pCount];
             for (int i = 0; i < pCount; i++)
             {
-                var p = vPoints[i];
-                pArr[i] = new NativePoint((float)p.X, (float)p.Y, (float)p.Z);
+                double radius = rCount == 1 ? vRadius[0] : vRadius[i];
+                if (radius < minimumRadius)
+                {
+                    skippedIndices.Add(i);
+                    continue;
+                }
+
+                acceptedPointCount++;
             }
 
-            // radii: double -> float
-            var rArr = new float[rCount];
-            for (int i = 0; i < rCount; i++) rArr[i] = (float)vRadius[i];
+            SkippedPointIndices = skippedIndices.ToArray();
+
+            if (acceptedPointCount == 0)
+            {
+                ErrorMessage = $"All points were skipped because their radii were below the 1.5-voxel minimum ({minimumRadius:G6} model units).";
+                return false;
+            }
+
+            // allocate once and fill
+            var pArr = new NativePoint[acceptedPointCount];
+            var rArr = new float[rCount == 1 ? 1 : acceptedPointCount];
+            if (rCount == 1)
+                rArr[0] = (float)vRadius[0];
+
+            int acceptedIndex = 0;
+            for (int i = 0; i < pCount; i++)
+            {
+                double radius = rCount == 1 ? vRadius[0] : vRadius[i];
+                if (radius < minimumRadius) continue;
+
+                var p = vPoints[i];
+                pArr[acceptedIndex] = new NativePoint((float)p.X, (float)p.Y, (float)p.Z);
+                if (rCount != 1)
+                    rArr[acceptedIndex] = (float)radius;
+                acceptedIndex++;
+            }
 
             unsafe
             {
                 fixed (NativePoint* pPtr = pArr)
                 fixed (float* rPtr = rArr)
                 {
-                    return DendroFromPoints(this.Grid, pPtr, (nuint)pCount, rPtr, (nuint)rCount, voxelSize, bandwidth);
+                    bool ok = DendroFromPoints(
+                        this.Grid,
+                        pPtr,
+                        (nuint)pArr.Length,
+                        rPtr,
+                        (nuint)rArr.Length,
+                        voxelSize,
+                        bandwidth);
+                    if (!ok)
+                        ErrorMessage = "OpenVDB did not produce a non-empty level set from the accepted points.";
+                    return ok;
                 }
             }
         }

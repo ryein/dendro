@@ -3,8 +3,10 @@
 
 #include <openvdb/util/Util.h>
 #include <vector>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <type_traits>
 
 // grid class constructors
@@ -42,8 +44,50 @@ DENDRO_API bool DendroWrite(DendroGrid *grid, const char *filename)
 // grid conversion methods
 DENDRO_API bool DendroFromPoints(DendroGrid *grid, const NativePoint *vPoints, size_t pCount, const float *vRadius, size_t rCount, double voxelSize, double bandwidth)
 {
-	NativeParticle plist(vPoints, pCount, vRadius, rCount);
-	return grid->FromPoints(plist, voxelSize, bandwidth);
+	const double background = bandwidth * voxelSize;
+	if (!grid || !vPoints || !vRadius || pCount == 0 ||
+		(rCount != 1 && rCount != pCount) ||
+		pCount > static_cast<size_t>(std::numeric_limits<openvdb::Index32>::max()) ||
+		!std::isfinite(voxelSize) || voxelSize <= 0.0 ||
+		!std::isfinite(bandwidth) || bandwidth <= 0.0 ||
+		!std::isfinite(background) ||
+		!std::isfinite(static_cast<float>(background)) ||
+		static_cast<float>(background) <= 0.0f)
+		return false;
+
+	const double coordLimit = static_cast<double>(std::numeric_limits<openvdb::Int32>::max()) - 1.0;
+	for (size_t i = 0; i < pCount; ++i)
+	{
+		const NativePoint &point = vPoints[i];
+		if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z))
+			return false;
+
+		const float radius = vRadius[rCount == 1 ? 0 : i];
+		if (!std::isfinite(radius) || radius <= 0.0f)
+			return false;
+
+		const double radiusInVoxels = static_cast<double>(radius) / voxelSize;
+		const double extent = radiusInVoxels + bandwidth + 1.0;
+		const double x = static_cast<double>(point.x) / voxelSize;
+		const double y = static_cast<double>(point.y) / voxelSize;
+		const double z = static_cast<double>(point.z) / voxelSize;
+		if (!std::isfinite(radiusInVoxels) || !std::isfinite(extent) ||
+			!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) ||
+			std::abs(x) + extent > coordLimit ||
+			std::abs(y) + extent > coordLimit ||
+			std::abs(z) + extent > coordLimit)
+			return false;
+	}
+
+	try
+	{
+		NativeParticle plist(vPoints, pCount, vRadius, rCount);
+		return grid->FromPoints(plist, voxelSize, bandwidth);
+	}
+	catch (...)
+	{
+		return false;
+	}
 }
 
 DENDRO_API bool DendroFromMesh(DendroGrid *grid, const NativePoint *vPoints, int vCount, const NativeFace *vFaces, int fCount, double voxelSize, double bandwidth)

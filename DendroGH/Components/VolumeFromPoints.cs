@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Grasshopper.Kernel;
 using Rhino.Geometry;
 
@@ -21,7 +22,7 @@ namespace DendroGH
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
             pManager.AddPointParameter("Points", "P", "Points to convert into a volume", GH_ParamAccess.list);
-            pManager.AddNumberParameter("Point Radius", "R", "Supply one value or a list of values equal to the number of curves supplied", GH_ParamAccess.list);
+            pManager.AddNumberParameter("Point Radius", "R", "Supply one radius for all points or one radius per supplied point", GH_ParamAccess.list);
             pManager.AddGenericParameter("Settings", "S", "Settings for converting different geometry types to and from volumes", GH_ParamAccess.item);
         }
 
@@ -47,21 +48,35 @@ namespace DendroGH
             if (!DA.GetDataList(1, vRadius)) return;
             if (!DA.GetData(2, ref vSettings)) return;
 
-            double minRadius = vSettings.VoxelSize / 0.6667;
-
-            foreach (float radius in vRadius)
+            if (vSettings == null)
             {
-                if (radius <= minRadius)
-                {
-                    AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Radius must be at least 33% larger than voxel size. This will compute but no volume will be created.");
-                }
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Volume settings are required.");
+                return;
             }
 
             DendroVolume volume = new DendroVolume(vPoints, vRadius, vSettings);
 
+            if (volume.SkippedPointIndices.Count > 0)
+            {
+                const int displayedIndexLimit = 20;
+                string displayedIndices = string.Join(
+                    ", ",
+                    volume.SkippedPointIndices.Take(displayedIndexLimit));
+                string remainder = volume.SkippedPointIndices.Count > displayedIndexLimit
+                    ? $" (+{volume.SkippedPointIndices.Count - displayedIndexLimit} more)"
+                    : string.Empty;
+                AddRuntimeMessage(
+                    GH_RuntimeMessageLevel.Warning,
+                    $"Skipped points below the 1.5-voxel minimum radius at zero-based indices: {displayedIndices}{remainder}.");
+            }
+
             if (!volume.IsValid)
             {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "Conversion failed. Make sure you supplied valid radius values or valid settings");
+                string error = string.IsNullOrWhiteSpace(volume.ErrorMessage)
+                    ? "Conversion failed. Make sure you supplied valid points, radii, and settings."
+                    : volume.ErrorMessage;
+                volume.Dispose();
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, error);
                 return;
             }
             DA.SetData(0, new VolumeGOO(volume));

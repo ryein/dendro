@@ -94,9 +94,22 @@ bool DendroGrid::FromPoints(NativeParticle plist, double voxelSize, double bandw
 {
 	using GridT = openvdb::FloatGrid;
 
+	const double background = bandwidth * voxelSize;
+	if (plist.size() == 0 || !std::isfinite(voxelSize) || voxelSize <= 0.0 ||
+		!std::isfinite(bandwidth) || bandwidth <= 0.0 ||
+		!std::isfinite(background) ||
+		!std::isfinite(static_cast<float>(background)) ||
+		static_cast<float>(background) <= 0.0f)
+		return false;
+
+	const openvdb::Real maximumRadius =
+		static_cast<openvdb::Real>(plist.getMaxRadius() / voxelSize);
+	if (!std::isfinite(maximumRadius) || maximumRadius < openvdb::Real(1.5))
+		return false;
+
 	// Grid values are signed distances in world units, so the background value
 	// is the voxel-space half-width multiplied by the voxel size.
-	GridT::Ptr sdf = GridT::create(static_cast<float>(bandwidth * voxelSize));
+	GridT::Ptr sdf = GridT::create(static_cast<float>(background));
 	sdf->setTransform(openvdb::math::Transform::createLinearTransform(voxelSize));
 	sdf->setGridClass(openvdb::GRID_LEVEL_SET);
 	sdf->setName("sdf");
@@ -104,12 +117,23 @@ bool DendroGrid::FromPoints(NativeParticle plist, double voxelSize, double bandw
 	// v12 ctor: just the grid (optionally an interrupter)
 	openvdb::tools::ParticlesToLevelSet<GridT> raster(*sdf);
 
-	// Optional clamps in *voxel units* if you want them:
-	// raster.setRmin(minRadiusWorld / voxelSize);
-	// raster.setRmax(maxRadiusWorld / voxelSize);
+	// Keep OpenVDB's sampling minimum explicit. The managed workload guard
+	// decides whether large spheres are safe, so allow the largest accepted
+	// input radius instead of silently applying OpenVDB's 100-voxel default.
+	raster.setRmin(1.5);
+	raster.setRmax(maximumRadius);
 
-	raster.rasterizeSpheres(plist); // per-particle radius is in world units
-	raster.finalize();
+	if (plist.hasUniformRadius())
+		raster.rasterizeSpheres(plist, static_cast<openvdb::Real>(plist.getRadius(0)));
+	else
+		raster.rasterizeSpheres(plist); // per-particle radii are in world units
+
+	// With attribute transfer disabled, finalize(false) is a no-op.
+	// finalize(true) prunes the completed level-set tree.
+	raster.finalize(true);
+
+	if (sdf->activeVoxelCount() == 0)
+		return false;
 
 	mGrid = std::move(sdf);
 	return true;
