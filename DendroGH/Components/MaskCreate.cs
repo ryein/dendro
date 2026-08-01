@@ -10,7 +10,7 @@ namespace DendroGH {
         /// </summary>
         public MaskCreate () : base ("Create Mask", "Mask",
             "Create a mask from a volume to be used in volume filter operations",
-            "Dendro", "Filters") { }
+            "Dendro", "Modify") { }
 
         /// <summary>
         /// Registers all the input parameters for this component.

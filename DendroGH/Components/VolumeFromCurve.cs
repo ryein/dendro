@@ -14,7 +14,7 @@ namespace DendroGH
         /// </summary>
         public CurveToVolume() : base("Curve To Volume", "vCurve",
             "Create a volume from a list of curves",
-            "Dendro", "Convert")
+            "Dendro", "Create")
         { }
 
         /// <summary>

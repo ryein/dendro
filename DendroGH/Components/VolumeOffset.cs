@@ -10,7 +10,7 @@ namespace DendroGH {
         /// </summary>
         public VolumeOffset () : base ("Offset Volume", "vOffset",
             "Offset a volume by a fixed amount",
-            "Dendro", "Filters") { }
+            "Dendro", "Modify") { }
 
         /// <summary>
         /// Registers all the input parameters for this component.

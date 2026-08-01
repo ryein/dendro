@@ -10,7 +10,7 @@ namespace DendroGH {
         /// </summary>
         public VolumeBlend() : base ("Volume Blend", "vBlend",
             "Blend between two volumes",
-            "Dendro", "Filters") { }
+            "Dendro", "Modify") { }
 
         /// <summary>
         /// Registers all the input parameters for this component.

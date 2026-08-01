@@ -10,7 +10,7 @@ namespace DendroGH {
         /// </summary>
         public VolumeUnion () : base ("Volume Union", "vUnion",
             "Perform a union operation on a set of volumes",
-            "Dendro", "Intersect") { }
+            "Dendro", "Combine") { }
 
         /// <summary>
         /// Registers all the input parameters for this component.

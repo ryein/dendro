@@ -10,7 +10,7 @@ namespace DendroGH {
         /// </summary>
         public VolumeSettings () : base ("Create Settings", "vSettings",
             "Settings for converting different geometry types to and from volumes",
-            "Dendro", "Convert") { }
+            "Dendro", "Create") { }
 
         /// <summary>
         /// Registers all the input parameters for this component.

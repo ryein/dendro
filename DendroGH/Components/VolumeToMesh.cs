@@ -12,7 +12,7 @@ namespace DendroGH
         /// </summary>
         public VolumeToMesh() : base("Volume to Mesh", "mVolume",
             "Create a mesh that approximates volume geometry",
-            "Dendro", "Convert")
+            "Dendro", "Mesh")
         { }
 
         /// <summary>

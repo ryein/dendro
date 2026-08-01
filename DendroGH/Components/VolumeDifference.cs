@@ -10,7 +10,7 @@ namespace DendroGH {
         /// </summary>
         public VolumeDifference () : base ("Volume Difference", "vDiff",
             "Perform a diference operation on a set of volumes",
-            "Dendro", "Intersect") { }
+            "Dendro", "Combine") { }
 
         /// <summary>
         /// Registers all the input parameters for this component.

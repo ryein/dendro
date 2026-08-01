@@ -13,7 +13,7 @@ namespace DendroGH
         /// </summary>
         public PointsToVolume() : base("Points To Volume", "vPoints",
             "Create a volume from a point set",
-            "Dendro", "Convert")
+            "Dendro", "Create")
         { }
 
         /// <summary>

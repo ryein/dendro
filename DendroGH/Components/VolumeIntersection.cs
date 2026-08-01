@@ -10,7 +10,7 @@ namespace DendroGH {
         /// </summary>
         public VolumeIntersection () : base ("Volume Intersection", "vInt",
             "Perform a intersection operation on a set of volumes",
-            "Dendro", "Intersect") { }
+            "Dendro", "Combine") { }
 
         /// <summary>
         /// Registers all the input parameters for this component.

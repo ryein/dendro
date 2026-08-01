@@ -10,7 +10,7 @@ namespace DendroGH {
         /// </summary>
         public VolumeFromMesh () : base ("Mesh to Volume", "vMesh",
             "Create a volume that approximates mesh geometry",
-            "Dendro", "Convert") { }
+            "Dendro", "Create") { }
 
         /// <summary>
         /// Registers all the input parameters for this component.

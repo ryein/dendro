@@ -10,7 +10,7 @@ namespace DendroGH {
         /// </summary>
         public VolumeSmooth () : base ("Smooth Volume", "vSmooth",
             "Apply smoothing to volume",
-            "Dendro", "Filters") { }
+            "Dendro", "Modify") { }
 
         /// <summary>
         /// Registers all the input parameters for this component.

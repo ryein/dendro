@@ -14,7 +14,7 @@ namespace DendroGH.Components
         public ClosestPoint()
           : base("Volume Closest Point", "vCP",
               "Find the closest point to a volume from a supplied list of points",
-            "Dendro", "Analysis")
+            "Dendro", "Analyze")
 
         {
         }
